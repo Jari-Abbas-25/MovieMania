@@ -19,7 +19,7 @@ and optional segmentation. Orchestration lives in `app/download.rs`.
   to prevent CDN stream rejections when downloading media segments.
 - **Stream Engines**:
   - **Progressive Streams** (CircleFTP, DhakaFlix, 4KHDHub, Addons): Handled directly by the native Rust multi-segment range downloader, splitting files into parallel chunks with `.part` state tracking.
-  - **MPEG-DASH Streams** (MovieBox): Multi-track segmented audio/video streams (`index.mpd`) requiring CloudFront cookie authentication. Downloaded via `yt-dlp` with automatic authentication header forwarding (`Cookie`, `Referer`, `User-Agent`), real-time progress parsing, and track multiplexing into `.mp4`.
+  - **MPEG-DASH Streams** (MovieBox): Multi-track segmented audio/video streams (`index.mpd`) requiring CloudFront cookie authentication. Downloaded via `yt-dlp` with automatic authentication header forwarding (`Cookie`, `Referer`, `User-Agent`), real-time progress parsing, and track multiplexing into `.mp4`. On Windows, background `yt-dlp` processes are spawned with `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP` to isolate transfers from terminal interrupt signals.
 
 ## External Tool Prerequisites
 
@@ -39,7 +39,7 @@ and length is capped.
 
 - **Series downloads:** Saved under `<base_dir>/Series/<Title>/Season <N>/<Title> - S<N:02>E<E:02>.<ext>` (and subtitle `<Title> - S<N:02>E<E:02>.<lang>.<sub_ext>`).
 - **Movie downloads:** Saved under `<base_dir>/Movies/<Title>/<Title>.<ext>` (and subtitle `<Title>.<lang>.<sub_ext>`).
-- **Default path:** Files go to the user's OS download directory (`~/Downloads/MovieBox-TUI`). On Android-family environments the code prefers shared `storage/downloads` when present.
+- **Default path:** Files go to the user's OS download directory (`~/Downloads/MovieBox-TUI`). On Android (Termux), the engine prefers shared `~/storage/downloads` when present, scoped strictly to verified Termux environments.
 - **Custom path:** Users can set a custom download directory in `/settings` → General → Download Folder or reset to default. Target directories are validated with a write probe before saving, and the code creates the `MovieBox-TUI` subfolder hierarchy (`Movies/` and `Series/`). If custom storage becomes unavailable at runtime, the engine falls back to the default download location.
 
 ## Contextual triggers & Seasons

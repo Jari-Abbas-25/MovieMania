@@ -63,6 +63,14 @@ impl SettingsCategory {
             Self::StorageInfo => "Maintenance",
         }
     }
+    pub fn compact_title(self) -> &'static str {
+        match self {
+            Self::General => "1:Gen",
+            Self::ContentModes => "2:Modes",
+            Self::Appearance => "3:Theme",
+            Self::StorageInfo => "4:Info",
+        }
+    }
 
     pub fn badge(self) -> &'static str {
         match self {
@@ -284,6 +292,10 @@ pub struct AppState {
     pub subtitle_list_state: ListState,
     pub pending_play_link: Option<String>,
     pub pending_playback_source: Option<crate::providers::models::PlaybackSource>,
+    pub show_overview_modal: bool,
+    pub overview_modal_scroll: usize,
+    pub overview_modal_title: String,
+    pub overview_modal_content: String,
     pub basic_terminal: bool,
     pub moviebox_enabled: bool,
     pub fourkhdhub_enabled: bool,
@@ -451,6 +463,10 @@ impl Default for AppState {
             subtitle_list_state: ListState::default(),
             pending_play_link: None,
             pending_playback_source: None,
+            show_overview_modal: false,
+            overview_modal_scroll: 0,
+            overview_modal_title: String::new(),
+            overview_modal_content: String::new(),
             moviebox_enabled: true,
             fourkhdhub_enabled: true,
             bdix_circleftp_enabled: false,
@@ -495,6 +511,33 @@ impl AppState {
         } else {
             AppMode::Streaming
         }
+    }
+    pub fn reset_details_view(&mut self) {
+        self.details_pane = DetailsPane::default();
+        self.selected_season = 1;
+        self.selected_episode = 1;
+        self.season_list_state.select(None);
+        self.episode_list_state.select(None);
+        self.language_list_state.select(None);
+        self.resource_list_state.select(None);
+        self.show_overview_modal = false;
+        self.subtitle_popup = false;
+        self.is_download_subtitle_popup = false;
+        self.player_picker_popup = false;
+        self.show_season_download_confirm = false;
+        self.show_episode_download_confirm = false;
+        self.selected_details = None;
+        self.selected_resources.clear();
+        self.active_subject_id = None;
+        self.available_seasons.clear();
+        self.available_episode_numbers.clear();
+        self.is_fetching_streams = false;
+        self.stream_error = None;
+        self.language_chosen = false;
+        self.stream_pool.clear();
+        self.pending_episode_fetch = None;
+        self.poster_image = None;
+        self.poster_protocol = None;
     }
 
     pub fn set_mode(&mut self, mode: AppMode) {
@@ -782,6 +825,7 @@ impl AppState {
             || self.is_download_subtitle_popup
             || self.show_season_download_confirm
             || self.show_episode_download_confirm
+            || self.show_overview_modal
             || (self.update_available.is_some() && self.input_mode != InputMode::Editing)
             || self.is_updating
             || (self.input_mode == InputMode::Editing && !self.search_suggestions.is_empty())
@@ -1270,6 +1314,109 @@ impl AppState {
             .rposition(|r| !matches!(r, AddonManagerRow::Header(_)))
         {
             self.addon_manager_selected = idx;
+        }
+    }
+    pub fn open_overview_modal(&mut self, title: String, content: String) {
+        self.overview_modal_title = title;
+        self.overview_modal_content = content;
+        self.overview_modal_scroll = 0;
+        self.show_overview_modal = true;
+    }
+
+    pub fn close_overview_modal(&mut self) {
+        self.show_overview_modal = false;
+        self.overview_modal_scroll = 0;
+    }
+
+    pub fn series_synopsis(&self) -> Option<(String, String)> {
+        let details = self.selected_details.as_ref()?;
+        let raw_title = if !details.title.trim().is_empty() {
+            &details.title
+        } else if let Some(res) = self
+            .search_results
+            .iter()
+            .find(|r| self.active_subject_id.as_deref() == Some(&r.id))
+        {
+            &res.title
+        } else {
+            "Unknown Title"
+        };
+        let title = crate::providers::moviebox::clean_moviebox_title(raw_title);
+        let intro = details
+            .description
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| {
+                self.search_preview
+                    .as_ref()
+                    .filter(|p| {
+                        p.id.value == details.id.value && p.id.provider == details.id.provider
+                    })
+                    .and_then(|p| p.description.as_deref())
+            })
+            .unwrap_or("No description available.");
+
+        Some((format!("{title} · Synopsis"), intro.to_string()))
+    }
+
+    pub fn episode_overview(&self) -> Option<(String, String)> {
+        let details = self.selected_details.as_ref()?;
+        let raw_title = if !details.title.trim().is_empty() {
+            &details.title
+        } else if let Some(res) = self
+            .search_results
+            .iter()
+            .find(|r| self.active_subject_id.as_deref() == Some(&r.id))
+        {
+            &res.title
+        } else {
+            "Unknown Title"
+        };
+        let title = crate::providers::moviebox::clean_moviebox_title(raw_title);
+
+        let season_idx = self.season_list_state.selected().unwrap_or(0);
+        let se_num = self
+            .available_seasons
+            .get(season_idx)
+            .map(|s| s.number)
+            .unwrap_or(1);
+        let selected_ep_idx = self.episode_list_state.selected().unwrap_or(0);
+        let ep_num = self
+            .available_episode_numbers
+            .get(season_idx)
+            .and_then(|nums| nums.get(selected_ep_idx).copied())
+            .unwrap_or(selected_ep_idx + 1);
+
+        let ep_match = details
+            .seasons
+            .iter()
+            .find(|s| s.number == se_num)
+            .and_then(|s| s.episodes.iter().find(|e| e.number == ep_num));
+
+        let ep_title = ep_match
+            .and_then(|e| e.title.as_deref())
+            .map(|t| t.trim())
+            .filter(|t| !t.is_empty());
+
+        let ep_overview = ep_match
+            .and_then(|e| e.overview.as_deref())
+            .map(|o| o.trim())
+            .filter(|o| !o.is_empty())?;
+
+        let modal_title = if let Some(t) = ep_title {
+            format!("{title} · S{se_num:02}E{ep_num:02} · {t}")
+        } else {
+            format!("{title} · S{se_num:02}E{ep_num:02}")
+        };
+
+        Some((modal_title, ep_overview.to_string()))
+    }
+
+    pub fn active_overview(&self) -> Option<(String, String)> {
+        if self.details_pane == DetailsPane::Episodes {
+            self.episode_overview().or_else(|| self.series_synopsis())
+        } else {
+            self.series_synopsis()
         }
     }
 }

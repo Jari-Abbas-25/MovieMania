@@ -14,11 +14,21 @@ impl App {
         }
         if self.state.show_help {
             match key.code {
-                KeyCode::Up | KeyCode::PageUp => {
+                KeyCode::Up => {
                     self.state.help_scroll = self.state.help_scroll.saturating_sub(1);
                 }
-                KeyCode::Down | KeyCode::PageDown => {
+                KeyCode::Down => {
                     self.state.help_scroll = self.state.help_scroll.saturating_add(1);
+                }
+                KeyCode::PageUp => {
+                    let rows = crossterm::terminal::size().map(|(_, r)| r).unwrap_or(24);
+                    let page_size = rows.saturating_sub(6).max(4) as usize;
+                    self.state.help_scroll = self.state.help_scroll.saturating_sub(page_size);
+                }
+                KeyCode::PageDown => {
+                    let rows = crossterm::terminal::size().map(|(_, r)| r).unwrap_or(24);
+                    let page_size = rows.saturating_sub(6).max(4) as usize;
+                    self.state.help_scroll = self.state.help_scroll.saturating_add(page_size);
                 }
                 KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?') => {
                     self.state.show_help = false;
@@ -104,10 +114,7 @@ impl App {
                         return None;
                     }
                     KeyCode::Char('o') | KeyCode::Char('O') => {
-                        let url = format!(
-                            "https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{}",
-                            version
-                        );
+                        let url = crate::updater::check::release_tag_url(version);
                         let _ = open::that(&url);
                         self.state.update_available = None;
                         return None;
@@ -149,6 +156,26 @@ impl App {
                         true,
                     );
                 }
+                KeyCode::PageUp => {
+                    let current = self.state.provider_list_state.selected().unwrap_or(0);
+                    let next = if total_count == 0 {
+                        0
+                    } else if current < 5 {
+                        total_count.saturating_sub(1)
+                    } else {
+                        current - 5
+                    };
+                    self.state.provider_list_state.select(Some(next));
+                }
+                KeyCode::PageDown => {
+                    let current = self.state.provider_list_state.selected().unwrap_or(0);
+                    let next = if total_count == 0 || current + 5 >= total_count {
+                        0
+                    } else {
+                        current + 5
+                    };
+                    self.state.provider_list_state.select(Some(next));
+                }
                 KeyCode::Home => {
                     if total_count > 0 {
                         self.state.provider_list_state.select(Some(0));
@@ -189,14 +216,14 @@ impl App {
                     self.state.show_browse_popup = false;
                     self.state.browse_list_state.select(None);
                 }
-                KeyCode::Up => {
+                KeyCode::Up | KeyCode::Char('k') => {
                     crate::tui::state::cycle_list_selection(
                         &mut self.state.browse_list_state,
                         total_count,
                         false,
                     );
                 }
-                KeyCode::Down => {
+                KeyCode::Down | KeyCode::Char('j') => {
                     crate::tui::state::cycle_list_selection(
                         &mut self.state.browse_list_state,
                         total_count,
@@ -258,6 +285,37 @@ impl App {
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
                     self.action_sender.send(Action::MoveDown).ok();
+                }
+                KeyCode::Home => {
+                    if !self.state.available_players.is_empty() {
+                        self.state.player_picker_state.select(Some(0));
+                    }
+                }
+                KeyCode::End => {
+                    if !self.state.available_players.is_empty() {
+                        let last = self.state.available_players.len().saturating_sub(1);
+                        self.state.player_picker_state.select(Some(last));
+                    }
+                }
+                KeyCode::PageUp => {
+                    let len = self.state.available_players.len();
+                    if len > 0 {
+                        let current = self.state.player_picker_state.selected().unwrap_or(0);
+                        let next = if current < 5 {
+                            len.saturating_sub(1)
+                        } else {
+                            current - 5
+                        };
+                        self.state.player_picker_state.select(Some(next));
+                    }
+                }
+                KeyCode::PageDown => {
+                    let len = self.state.available_players.len();
+                    if len > 0 {
+                        let current = self.state.player_picker_state.selected().unwrap_or(0);
+                        let next = if current + 5 >= len { 0 } else { current + 5 };
+                        self.state.player_picker_state.select(Some(next));
+                    }
                 }
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     self.action_sender.send(Action::Submit).ok();
@@ -381,42 +439,9 @@ impl App {
                     KeyCode::Enter => {
                         self.action_sender.send(Action::SettingsActivateRow).ok();
                     }
-                    KeyCode::Left => {
-                        input.move_left();
+                    _ => {
+                        input.handle_key(key);
                     }
-                    KeyCode::Right => {
-                        input.move_right();
-                    }
-                    KeyCode::Home => {
-                        input.move_home();
-                    }
-                    KeyCode::End => {
-                        input.move_end();
-                    }
-                    KeyCode::Backspace => {
-                        input.delete_backwards();
-                    }
-                    KeyCode::Delete => {
-                        input.delete_forwards();
-                    }
-                    KeyCode::Char('u') | KeyCode::Char('U')
-                        if key
-                            .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        input.clear();
-                    }
-                    KeyCode::Char('w') | KeyCode::Char('W')
-                        if key
-                            .modifiers
-                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
-                        input.delete_word_backwards();
-                    }
-                    KeyCode::Char(c) if !c.is_control() => {
-                        input.insert(c);
-                    }
-                    _ => {}
                 }
                 return None;
             }
@@ -641,213 +666,140 @@ impl App {
                     _ => {}
                 }
             }
-            InputMode::Normal => {
-                match self.state.active_screen {
-                    Screen::Home => {
-                        if self.state.addon_manager_popup {
-                            if self.state.addon_input_active {
-                                match key.code {
-                                    KeyCode::Esc => {
-                                        self.state.addon_input_active = false;
-                                        self.state.addon_input_buffer.clear();
-                                    }
-                                    KeyCode::Enter => {
-                                        let buffer = self
-                                            .state
-                                            .addon_input_buffer
-                                            .as_str()
-                                            .trim()
-                                            .to_string();
-                                        self.state.addon_input_active = false;
-                                        self.state.addon_input_buffer.clear();
-                                        if !buffer.is_empty() {
-                                            self.action_sender
-                                                .send(Action::AddonAddManifest(buffer))
-                                                .ok();
-                                        }
-                                    }
-                                    KeyCode::Left => {
-                                        self.state.addon_input_buffer.move_left();
-                                    }
-                                    KeyCode::Right => {
-                                        self.state.addon_input_buffer.move_right();
-                                    }
-                                    KeyCode::Home => {
-                                        self.state.addon_input_buffer.move_home();
-                                    }
-                                    KeyCode::End => {
-                                        self.state.addon_input_buffer.move_end();
-                                    }
-                                    KeyCode::Backspace => {
-                                        self.state.addon_input_buffer.delete_backwards();
-                                    }
-                                    KeyCode::Delete => {
-                                        self.state.addon_input_buffer.delete_forwards();
-                                    }
-                                    KeyCode::Char('u') | KeyCode::Char('U')
-                                        if key
-                                            .modifiers
-                                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                                    {
-                                        self.state.addon_input_buffer.clear();
-                                    }
-                                    KeyCode::Char('w') | KeyCode::Char('W')
-                                        if key
-                                            .modifiers
-                                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                                    {
-                                        self.state.addon_input_buffer.delete_word_backwards();
-                                    }
-                                    KeyCode::Char(c) if !c.is_control() => {
-                                        self.state.addon_input_buffer.insert(c);
-                                    }
-                                    _ => {}
-                                }
-                                return None;
-                            }
+            InputMode::Normal => match self.state.active_screen {
+                Screen::Home => {
+                    if self.state.addon_manager_popup {
+                        if self.state.addon_input_active {
                             match key.code {
                                 KeyCode::Esc => {
-                                    self.reset_transient_overlays();
-                                    self.state.addon_manager_popup = false;
+                                    self.state.addon_input_active = false;
+                                    self.state.addon_input_buffer.clear();
                                 }
-                                KeyCode::Up => {
-                                    self.state.step_addon_manager_selected(-1);
-                                }
-                                KeyCode::Down => {
-                                    self.state.step_addon_manager_selected(1);
-                                }
-                                KeyCode::Home => {
-                                    self.state.first_addon_manager_selected();
-                                }
-                                KeyCode::End => {
-                                    self.state.last_addon_manager_selected();
-                                }
-                                KeyCode::PageUp => {
-                                    self.state.step_addon_manager_selected(-5);
-                                }
-                                KeyCode::PageDown => {
-                                    self.state.step_addon_manager_selected(5);
-                                }
-                                KeyCode::Char('d') | KeyCode::Delete => {
-                                    use crate::tui::state::AddonManagerRow;
-                                    if let Some(AddonManagerRow::Addon(index)) = self
-                                        .state
-                                        .addon_manager_rows()
-                                        .get(self.state.addon_manager_selected)
-                                        .copied()
-                                    {
-                                        self.action_sender.send(Action::AddonRemove(index)).ok();
-                                    }
-                                }
-                                KeyCode::Enter | KeyCode::Char(' ') => {
-                                    self.addon_manager_activate();
-                                }
-                                _ => {}
-                            }
-                            return None;
-                        }
-
-                        if self.state.tv_config_popup {
-                            if self.state.tv_input_active {
-                                match key.code {
-                                    KeyCode::Esc => {
-                                        self.state.tv_input_active = false;
-                                        self.state.tv_input_buffer.clear();
-                                    }
-                                    KeyCode::Enter => {
-                                        let buffer =
-                                            self.state.tv_input_buffer.as_str().trim().to_string();
-                                        self.state.tv_input_active = false;
-                                        self.state.tv_input_buffer.clear();
-                                        if !buffer.is_empty() {
-                                            self.action_sender
-                                                .send(Action::TvPlaylistAdd(buffer))
-                                                .ok();
-                                        }
-                                    }
-                                    KeyCode::Left => {
-                                        self.state.tv_input_buffer.move_left();
-                                    }
-                                    KeyCode::Right => {
-                                        self.state.tv_input_buffer.move_right();
-                                    }
-                                    KeyCode::Home => {
-                                        self.state.tv_input_buffer.move_home();
-                                    }
-                                    KeyCode::End => {
-                                        self.state.tv_input_buffer.move_end();
-                                    }
-                                    KeyCode::Backspace => {
-                                        self.state.tv_input_buffer.delete_backwards();
-                                    }
-                                    KeyCode::Delete => {
-                                        self.state.tv_input_buffer.delete_forwards();
-                                    }
-                                    KeyCode::Char('u') | KeyCode::Char('U')
-                                        if key
-                                            .modifiers
-                                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                                    {
-                                        self.state.tv_input_buffer.clear();
-                                    }
-                                    KeyCode::Char('w') | KeyCode::Char('W')
-                                        if key
-                                            .modifiers
-                                            .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                                    {
-                                        self.state.tv_input_buffer.delete_word_backwards();
-                                    }
-                                    KeyCode::Char(c) if !c.is_control() => {
-                                        self.state.tv_input_buffer.insert(c);
-                                    }
-                                    _ => {}
-                                }
-                                return None;
-                            }
-                            match key.code {
-                                KeyCode::Esc => {
-                                    self.reset_transient_overlays();
-                                    self.state.tv_config_popup = false;
-                                }
-                                KeyCode::Up => {
-                                    self.state.step_tv_manager_selected(-1);
-                                }
-                                KeyCode::Down => {
-                                    self.state.step_tv_manager_selected(1);
-                                }
-                                KeyCode::Home => {
-                                    self.state.first_tv_manager_selected();
-                                }
-                                KeyCode::End => {
-                                    self.state.last_tv_manager_selected();
-                                }
-                                KeyCode::PageUp => {
-                                    self.state.step_tv_manager_selected(-5);
-                                }
-                                KeyCode::PageDown => {
-                                    self.state.step_tv_manager_selected(5);
-                                }
-                                KeyCode::Char('d') | KeyCode::Delete => {
-                                    use crate::tui::state::TvManagerRow;
-                                    if let Some(TvManagerRow::Playlist(index)) = self
-                                        .state
-                                        .tv_manager_rows()
-                                        .get(self.state.tv_manager_selected)
-                                        .copied()
-                                    {
+                                KeyCode::Enter => {
+                                    let buffer =
+                                        self.state.addon_input_buffer.as_str().trim().to_string();
+                                    self.state.addon_input_active = false;
+                                    self.state.addon_input_buffer.clear();
+                                    if !buffer.is_empty() {
                                         self.action_sender
-                                            .send(Action::TvPlaylistRemove(index))
+                                            .send(Action::AddonAddManifest(buffer))
                                             .ok();
                                     }
                                 }
-                                KeyCode::Enter | KeyCode::Char(' ') => {
-                                    self.tv_manager_activate();
+                                _ => {
+                                    self.state.addon_input_buffer.handle_key(key);
                                 }
-                                _ => {}
                             }
                             return None;
                         }
                         match key.code {
+                            KeyCode::Esc => {
+                                self.reset_transient_overlays();
+                                self.state.addon_manager_popup = false;
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                self.state.step_addon_manager_selected(-1);
+                            }
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                self.state.step_addon_manager_selected(1);
+                            }
+                            KeyCode::Home => {
+                                self.state.first_addon_manager_selected();
+                            }
+                            KeyCode::End => {
+                                self.state.last_addon_manager_selected();
+                            }
+                            KeyCode::PageUp => {
+                                self.state.step_addon_manager_selected(-5);
+                            }
+                            KeyCode::PageDown => {
+                                self.state.step_addon_manager_selected(5);
+                            }
+                            KeyCode::Char('d') | KeyCode::Delete => {
+                                use crate::tui::state::AddonManagerRow;
+                                if let Some(AddonManagerRow::Addon(index)) = self
+                                    .state
+                                    .addon_manager_rows()
+                                    .get(self.state.addon_manager_selected)
+                                    .copied()
+                                {
+                                    self.action_sender.send(Action::AddonRemove(index)).ok();
+                                }
+                            }
+                            KeyCode::Enter | KeyCode::Char(' ') => {
+                                self.addon_manager_activate();
+                            }
+                            _ => {}
+                        }
+                        return None;
+                    }
+
+                    if self.state.tv_config_popup {
+                        if self.state.tv_input_active {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.state.tv_input_active = false;
+                                    self.state.tv_input_buffer.clear();
+                                }
+                                KeyCode::Enter => {
+                                    let buffer =
+                                        self.state.tv_input_buffer.as_str().trim().to_string();
+                                    self.state.tv_input_active = false;
+                                    self.state.tv_input_buffer.clear();
+                                    if !buffer.is_empty() {
+                                        self.action_sender.send(Action::TvPlaylistAdd(buffer)).ok();
+                                    }
+                                }
+                                _ => {
+                                    self.state.tv_input_buffer.handle_key(key);
+                                }
+                            }
+                            return None;
+                        }
+                        match key.code {
+                            KeyCode::Esc => {
+                                self.reset_transient_overlays();
+                                self.state.tv_config_popup = false;
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                self.state.step_tv_manager_selected(-1);
+                            }
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                self.state.step_tv_manager_selected(1);
+                            }
+                            KeyCode::Home => {
+                                self.state.first_tv_manager_selected();
+                            }
+                            KeyCode::End => {
+                                self.state.last_tv_manager_selected();
+                            }
+                            KeyCode::PageUp => {
+                                self.state.step_tv_manager_selected(-5);
+                            }
+                            KeyCode::PageDown => {
+                                self.state.step_tv_manager_selected(5);
+                            }
+                            KeyCode::Char('d') | KeyCode::Delete => {
+                                use crate::tui::state::TvManagerRow;
+                                if let Some(TvManagerRow::Playlist(index)) = self
+                                    .state
+                                    .tv_manager_rows()
+                                    .get(self.state.tv_manager_selected)
+                                    .copied()
+                                {
+                                    self.action_sender
+                                        .send(Action::TvPlaylistRemove(index))
+                                        .ok();
+                                }
+                            }
+                            KeyCode::Enter | KeyCode::Char(' ') => {
+                                self.tv_manager_activate();
+                            }
+                            _ => {}
+                        }
+                        return None;
+                    }
+                    match key.code {
                         KeyCode::Esc => {
                             self.action_sender.send(Action::GoBack).ok();
                         }
@@ -1015,11 +967,8 @@ impl App {
                         {
                             if self.state.favorites_focus {
                                 if let Some(idx) = self.state.favorites_landing_state.selected() {
-                                    let target = self
-                                        .state
-                                        .continue_watching_items()
-                                        .get(idx)
-                                        .map(|item| {
+                                    let target =
+                                        self.state.continue_watching_items().get(idx).map(|item| {
                                             (
                                                 item.title.clone(),
                                                 item.provider.clone(),
@@ -1028,15 +977,24 @@ impl App {
                                                 item.episode,
                                             )
                                         });
-                                    if let Some((title, provider, subject_id, season, episode)) = target {
-                                        self.state.history.remove(&provider, &subject_id, season, episode);
+                                    if let Some((title, provider, subject_id, season, episode)) =
+                                        target
+                                    {
+                                        self.state.history.remove(
+                                            &provider,
+                                            &subject_id,
+                                            season,
+                                            episode,
+                                        );
                                         self.state.homepage_cache.clear();
                                         let total = self.state.landing_deck_items_count();
                                         if total == 0 {
                                             self.state.favorites_focus = false;
                                             self.state.favorites_landing_state.select(None);
                                         } else if idx >= total {
-                                            self.state.favorites_landing_state.select(Some(total.saturating_sub(1)));
+                                            self.state
+                                                .favorites_landing_state
+                                                .select(Some(total.saturating_sub(1)));
                                         }
                                         self.state.notify(
                                             crate::tui::overlay::NotificationKind::Info,
@@ -1049,10 +1007,17 @@ impl App {
                                 if idx < self.state.search_results.len() {
                                     let res = self.state.search_results.remove(idx);
                                     let provider_key = res.provider.cache_key();
-                                    self.state.history.remove(provider_key, &res.id, res.season, res.episode);
+                                    self.state.history.remove(
+                                        provider_key,
+                                        &res.id,
+                                        res.season,
+                                        res.episode,
+                                    );
                                     self.state.history.recent.retain(|i| {
                                         !(i.subject_id == res.id
-                                            && (crate::providers::models::ProviderKind::parse(&i.provider) == Some(res.provider)
+                                            && (crate::providers::models::ProviderKind::parse(
+                                                &i.provider,
+                                            ) == Some(res.provider)
                                                 || i.provider.eq_ignore_ascii_case(provider_key)))
                                     });
                                     self.state.history.save();
@@ -1061,7 +1026,9 @@ impl App {
                                     if total == 0 {
                                         self.state.search_list_state.select(None);
                                     } else if idx >= total {
-                                        self.state.search_list_state.select(Some(total.saturating_sub(1)));
+                                        self.state
+                                            .search_list_state
+                                            .select(Some(total.saturating_sub(1)));
                                     }
                                     self.state.notify(
                                         crate::tui::overlay::NotificationKind::Info,
@@ -1111,8 +1078,39 @@ impl App {
                         }
                         _ => {}
                     }
+                }
+                Screen::Details => {
+                    if self.state.show_overview_modal {
+                        match key.code {
+                            KeyCode::Esc
+                            | KeyCode::Char('q')
+                            | KeyCode::Char('Q')
+                            | KeyCode::Char('i')
+                            | KeyCode::Char('I')
+                            | KeyCode::Enter => {
+                                self.state.close_overview_modal();
+                            }
+                            KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
+                                self.state.overview_modal_scroll =
+                                    self.state.overview_modal_scroll.saturating_sub(1);
+                            }
+                            KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
+                                self.state.overview_modal_scroll =
+                                    self.state.overview_modal_scroll.saturating_add(1);
+                            }
+                            KeyCode::PageUp => {
+                                self.state.overview_modal_scroll =
+                                    self.state.overview_modal_scroll.saturating_sub(5);
+                            }
+                            KeyCode::PageDown => {
+                                self.state.overview_modal_scroll =
+                                    self.state.overview_modal_scroll.saturating_add(5);
+                            }
+                            _ => {}
+                        }
+                        return None;
                     }
-                    Screen::Details => match key.code {
+                    match key.code {
                         KeyCode::Tab => {
                             if self.state.show_season_download_confirm {
                                 self.state.season_download_confirm_yes_selected =
@@ -1120,7 +1118,9 @@ impl App {
                             } else if self.state.show_episode_download_confirm {
                                 self.state.episode_download_confirm_yes_selected =
                                     !self.state.episode_download_confirm_yes_selected;
-                            } else if !self.state.subtitle_popup && !self.state.player_picker_popup
+                            } else if !self.state.subtitle_popup
+                                && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
                             {
                                 self.action_sender.send(Action::TabPane).ok();
                             }
@@ -1132,7 +1132,9 @@ impl App {
                             } else if self.state.show_episode_download_confirm {
                                 self.state.episode_download_confirm_yes_selected =
                                     !self.state.episode_download_confirm_yes_selected;
-                            } else if !self.state.subtitle_popup && !self.state.player_picker_popup
+                            } else if !self.state.subtitle_popup
+                                && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
                             {
                                 self.action_sender.send(Action::BackTabPane).ok();
                             }
@@ -1142,6 +1144,8 @@ impl App {
                                 self.action_sender.send(Action::ConfirmDownloadSeason).ok();
                             } else if self.state.show_episode_download_confirm {
                                 self.action_sender.send(Action::ConfirmDownloadEpisode).ok();
+                            } else {
+                                return None;
                             }
                         }
                         KeyCode::Char('n') | KeyCode::Char('N') => {
@@ -1149,6 +1153,8 @@ impl App {
                                 self.state.show_season_download_confirm = false;
                             } else if self.state.show_episode_download_confirm {
                                 self.state.show_episode_download_confirm = false;
+                            } else {
+                                return None;
                             }
                         }
                         KeyCode::Esc => {
@@ -1163,6 +1169,7 @@ impl App {
                         KeyCode::Char(' ') | KeyCode::Char('p') | KeyCode::Char('P') => {
                             if !self.state.subtitle_popup
                                 && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
                                 && !self.state.show_season_download_confirm
                                 && !self.state.show_episode_download_confirm
                             {
@@ -1188,7 +1195,10 @@ impl App {
                             self.action_sender.send(Action::Quit).ok();
                         }
                         KeyCode::Char('d') | KeyCode::Char('D') => {
-                            if !self.state.subtitle_popup && !self.state.player_picker_popup {
+                            if !self.state.subtitle_popup
+                                && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
+                            {
                                 if let crate::tui::state::DetailsPane::Seasons =
                                     self.state.details_pane
                                 {
@@ -1200,9 +1210,22 @@ impl App {
                                 }
                             }
                         }
+                        KeyCode::Char('i') | KeyCode::Char('I') => {
+                            if !self.state.subtitle_popup
+                                && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
+                                && !self.state.show_season_download_confirm
+                                && !self.state.show_episode_download_confirm
+                            {
+                                if let Some((title, content)) = self.state.active_overview() {
+                                    self.state.open_overview_modal(title, content);
+                                }
+                            }
+                        }
                         KeyCode::Char('r') => {
                             if !self.state.subtitle_popup
                                 && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
                                 && !self.state.show_season_download_confirm
                                 && !self.state.show_episode_download_confirm
                             {
@@ -1215,6 +1238,7 @@ impl App {
                         KeyCode::Char('f') | KeyCode::Char('F') => {
                             if !self.state.subtitle_popup
                                 && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
                                 && !self.state.show_season_download_confirm
                                 && !self.state.show_episode_download_confirm
                                 && self.state.favorites_available()
@@ -1234,7 +1258,9 @@ impl App {
                                 self.state.season_download_confirm_yes_selected = true;
                             } else if self.state.show_episode_download_confirm {
                                 self.state.episode_download_confirm_yes_selected = true;
-                            } else if !self.state.subtitle_popup && !self.state.player_picker_popup
+                            } else if !self.state.subtitle_popup
+                                && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
                             {
                                 self.action_sender.send(Action::BackTabPane).ok();
                             }
@@ -1244,7 +1270,9 @@ impl App {
                                 self.state.season_download_confirm_yes_selected = false;
                             } else if self.state.show_episode_download_confirm {
                                 self.state.episode_download_confirm_yes_selected = false;
-                            } else if !self.state.subtitle_popup && !self.state.player_picker_popup
+                            } else if !self.state.subtitle_popup
+                                && !self.state.player_picker_popup
+                                && !self.state.is_download_subtitle_popup
                             {
                                 self.action_sender.send(Action::TabPane).ok();
                             }
@@ -1288,9 +1316,9 @@ impl App {
                             }
                         }
                         _ => {}
-                    },
+                    }
                 }
-            }
+            },
         }
         None
     }
@@ -1594,5 +1622,66 @@ mod tests {
         app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::empty()))
             .await;
         assert_eq!(app.state.status_message, "Search cleared.");
+    }
+
+    #[tokio::test]
+    async fn test_details_overview_modal_keyboard_toggle_and_scroll() {
+        let mut app = App::new();
+        app.state.active_screen = crate::tui::state::Screen::Details;
+        app.state.input_mode = InputMode::Normal;
+        app.state.selected_details = Some(crate::providers::models::MediaDetails {
+            id: crate::providers::models::ProviderMediaId {
+                provider: crate::providers::models::ProviderKind::MovieBox,
+                value: "movie_1".to_string(),
+            },
+            title: "Interstellar".to_string(),
+            media_type: crate::providers::models::MediaType::Movie,
+            year: Some("2014".to_string()),
+            description: Some("Space exploration epic.".to_string()),
+            tagline: None,
+            imdb_rating: None,
+            director: None,
+            stars: None,
+            prints: None,
+            audios: None,
+            poster_url: None,
+            duration: None,
+            genres: vec![],
+            seasons: vec![],
+            dubs: vec![],
+        });
+
+        assert!(!app.state.show_overview_modal);
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::empty()))
+            .await;
+        assert!(app.state.show_overview_modal);
+        assert_eq!(app.state.overview_modal_title, "Interstellar · Synopsis");
+        assert_eq!(app.state.overview_modal_content, "Space exploration epic.");
+        assert_eq!(app.state.overview_modal_scroll, 0);
+
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.overview_modal_scroll, 1);
+
+        app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.overview_modal_scroll, 6);
+
+        app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()))
+            .await;
+        assert_eq!(app.state.overview_modal_scroll, 5);
+
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()))
+            .await;
+        assert!(!app.state.show_overview_modal);
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::empty()))
+            .await;
+        assert!(app.state.show_overview_modal);
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::empty()))
+            .await;
+        assert!(!app.state.show_overview_modal);
     }
 }

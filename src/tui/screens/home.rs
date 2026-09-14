@@ -1880,15 +1880,21 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 }
             }
 
-            crate::tui::widgets::render_scrollbar(
-                frame,
-                results_chunk,
-                state.search_results.len(),
-                metrics.visible_items,
-                state.result_scroll,
-                theme,
-                state.basic_terminal,
-            );
+            let cols = (metrics.columns as usize).max(1);
+            let total_rows = state.search_results.len().div_ceil(cols);
+            let viewport_rows = metrics.visible_items.div_ceil(cols);
+            let current_row = state.result_scroll / cols;
+            if !modal_active {
+                crate::tui::widgets::render_scrollbar(
+                    frame,
+                    results_chunk,
+                    total_rows,
+                    viewport_rows,
+                    current_row,
+                    theme,
+                    state.basic_terminal,
+                );
+            }
         } else {
             render_search_state(frame, results_chunk, state, theme, view);
         }

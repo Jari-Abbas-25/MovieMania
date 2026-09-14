@@ -873,9 +873,20 @@ impl App {
                 let sender = self.action_sender.clone();
                 tokio::spawn(async move {
                     let timeout = std::time::Duration::from_secs(3);
-                    let circleftp =
-                        crate::net::probe_url("http://new.circleftp.net:5000/api", timeout).await;
-                    let dhakaflix = crate::net::probe_url("http://172.16.50.7/", timeout).await;
+                    let (circleftp, dhakaflix) = tokio::join!(
+                        crate::net::probe_url(
+                            crate::providers::bdix::circleftp::client::POSTS_URL,
+                            timeout,
+                        ),
+                        async {
+                            for (server, _) in crate::providers::bdix::dhakaflix::client::SERVERS {
+                                if crate::net::probe_url(server, timeout).await {
+                                    return true;
+                                }
+                            }
+                            false
+                        }
+                    );
                     sender
                         .send(Action::BdixProbeResult {
                             circleftp,
@@ -889,8 +900,10 @@ impl App {
                 circleftp,
                 dhakaflix,
             } => {
-                self.state.bdix_circleftp_enabled = circleftp;
-                self.state.bdix_dhakaflix_enabled = dhakaflix;
+                let prev_c = self.state.bdix_circleftp_enabled;
+                let prev_d = self.state.bdix_dhakaflix_enabled;
+                self.state.bdix_circleftp_enabled = circleftp || prev_c;
+                self.state.bdix_dhakaflix_enabled = dhakaflix || prev_d;
                 self.state.bdix_probed = true;
                 if !self.state.provider_enabled(self.state.active_provider) {
                     let next = self
@@ -902,12 +915,14 @@ impl App {
                     self.switch_provider(next);
                 }
                 self.persist_config();
-                if circleftp || dhakaflix {
+                let newly_c = circleftp && !prev_c;
+                let newly_d = dhakaflix && !prev_d;
+                if newly_c || newly_d {
                     let mut found = Vec::new();
-                    if circleftp {
+                    if newly_c {
                         found.push("CircleFTP");
                     }
-                    if dhakaflix {
+                    if newly_d {
                         found.push("DhakaFlix");
                     }
                     self.state.notify(

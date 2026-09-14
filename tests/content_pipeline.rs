@@ -99,7 +99,7 @@ async fn test_stale_details_response_protection() {
         context_a,
         1,
         "movie_a".to_string(),
-        stale_payload,
+        Box::new(stale_payload),
     ))
     .await;
 
@@ -134,7 +134,7 @@ async fn test_stale_details_response_protection() {
         context_b,
         2,
         "movie_b".to_string(),
-        valid_payload,
+        Box::new(valid_payload),
     ))
     .await;
 
@@ -398,6 +398,7 @@ async fn test_series_details_defaults_to_season_one_when_no_history() {
                     season: s,
                     number: e,
                     title: None,
+                    overview: None,
                 })
                 .collect(),
         })
@@ -429,7 +430,7 @@ async fn test_series_details_defaults_to_season_one_when_no_history() {
         context,
         1,
         "bb_series".to_string(),
-        details,
+        Box::new(details),
     ))
     .await;
 
@@ -478,6 +479,7 @@ async fn test_series_details_resumes_watch_history() {
                     season: s,
                     number: e,
                     title: None,
+                    overview: None,
                 })
                 .collect(),
         })
@@ -509,7 +511,7 @@ async fn test_series_details_resumes_watch_history() {
         context,
         1,
         "bb_series".to_string(),
-        details,
+        Box::new(details),
     ))
     .await;
 
@@ -544,6 +546,7 @@ async fn test_series_details_preserves_season_and_episode_on_language_switch() {
                     season: s,
                     number: e,
                     title: None,
+                    overview: None,
                 })
                 .collect(),
         })
@@ -575,7 +578,7 @@ async fn test_series_details_preserves_season_and_episode_on_language_switch() {
         context,
         1,
         "bb_series".to_string(),
-        details,
+        Box::new(details),
     ))
     .await;
 

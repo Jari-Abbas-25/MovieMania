@@ -47,7 +47,7 @@ pub fn circleftp_search_to_catalog(response: &CircleFtpSearchResponse) -> Vec<Ca
                 .image
                 .as_ref()
                 .or(post.image_sm.as_ref())
-                .map(|img| format!("http://new.circleftp.net:5000/uploads/{}", img));
+                .map(|img| format!("{}{}", super::client::UPLOADS_URL, img));
 
             items.push(CatalogItem {
                 id: ProviderMediaId {

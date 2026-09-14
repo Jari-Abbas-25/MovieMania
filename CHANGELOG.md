@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added
+- **Overview and Synopsis Modal with Stremio Episode Summary Support**:
+  - Implemented a centered, scrollable Overview/Synopsis dialog (`draw_overview_modal` in `src/tui/overlay.rs`) for inspecting full, unwrapped descriptions of movies, TV shows, and episodes without layout distortion.
+  - Added keyboard shortcut `i` / `I` and footer action `[i] Info` in the Details screen to toggle the overview dialog, with `↑`/`↓`/`j`/`k`/`PageUp`/`PageDown` content scrolling and `Esc`/`q`/`Enter`/`i` dismissal.
+  - Added mouse interaction opening the overview modal when clicking the header metadata card, dismiss-on-outside-click, and mouse wheel scrolling.
+  - Appended `... [i]` truncation indicator in header synopsis rendering when text exceeds the bounded header row budget.
+  - Extended canonical `Episode` data model (`src/providers/models.rs`) with `pub overview: Option<String>` and updated the Stremio Addons metadata adapter (`src/providers/addons/`) to deserialize and forward episode descriptions and titles from `MetaVideo`.
+
+- **Modal Picker Navigation & Page Scrolling Unification**:
+  - Added `j` and `k` vim key navigation across Browse Categories, TV Playlist Manager, and Stremio Addon Manager popups, unifying list navigation bindings across all modals.
+  - Added `PageUp` and `PageDown` 5-item stepping to Provider menu and Player picker popups, and `Home` / `End` boundary jumping to Player picker.
+  - Fixed `PageUp` and `PageDown` in Help overlay to scroll by dynamic visible terminal page height instead of single-line stepping.
+  - Directly confirmed or canceled download confirmation dialogs via `y`/`Y` and `n`/`N` only when active, preventing dead branches on the Details screen.
+
+- **Named Constants & Path Centralization**:
+  - Extracted canonical `TERMUX_PREFIX_USR` constant in `src/updater/artifact.rs` and refactored scattered Termux binaries and library path probes across `src/player.rs`.
+  - Extracted `STANDARD_UNIX_BIN_DIRS` in `src/player.rs` consolidating repeated `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, and nix profiles.
+  - Extracted `MAX_PLAYLIST_BYTES` (15 MiB limit) in `src/providers/tv/parser.rs` replacing 4 duplicate inline checks.
+  - Added `total_duration()` on `NotificationKind` in `src/models.rs`, eliminating duplicated duration matching in `src/tui/overlay.rs`.
+  - Extracted `ENV_MOVIEBOX_PLAYER`, `STREAM_REFERER`, `SESSION_CACHE_FILE`, `APP_HTTP_USER_AGENT`, `release_tag_url`, and `CIRCLEFTP_BASE_URL` into canonical module constants.
+
 ### Changed
 - **Modal Geometry and Margin Symmetrization**:
   - Balanced four-sided padding in `draw_updating_modal` ("Self-Update in Progress"), standardizing outer dimensions to 50x7 columns with equal 1-row top and bottom margins and symmetrical side margins.
@@ -11,6 +32,67 @@
   - Stripped redundant `"Press [o] to read full changelog on GitHub"` line from release note bodies to avoid duplicating the bottom `[o] Open Release Page` action button.
 
 ### Fixed
+- **Codebase Production-Readiness & Reliability Hardening**:
+  - Fixed UTF-8 byte boundary slicing panic in download path input rendering (`src/tui/widgets/settings.rs`) by computing grapheme-to-byte offsets via `input.cursor_byte_offset()`.
+  - Prevented playback lockups when stream resolution fails or times out in background resolution tasks (`src/tui/app/playback.rs`) by dispatching `Action::PlayerExited` to reset `is_resolving_playback` and `is_playing`.
+  - Resolved permanent Flatpak player cache miss loop (`src/player.rs`) by checking command string prefixes (`"flatpak run "`) alongside filesystem path probes.
+  - Prevented GNU Automake `/usr/bin/am` on desktop Linux from being falsely detected as the Android Activity Manager (`src/player.rs`) by strictly gating system `am` probes behind `target_os = "android"`.
+  - Isolated Details screen keyboard handling from background pane cycling and conflicting modal actions when `is_download_subtitle_popup` is active (`src/tui/app/keyboard.rs`).
+  - Cleared stale modal overlay flags on provider switches and view resets (`src/tui/app/navigation.rs` and `src/tui/state.rs`).
+  - Detached Windows self-updater helper process (`src/updater/apply.rs`) using `DETACHED_PROCESS` and `CREATE_NEW_PROCESS_GROUP`, preventing console termination on exit from aborting in-flight binary replacement.
+  - Isolated background `yt-dlp` downloads on Windows (`src/tui/app/download.rs`) in a separate process group (`CREATE_NEW_PROCESS_GROUP`), preventing terminal `Ctrl+C` interrupt signals from prematurely killing active downloads.
+  - Restricted Android `~/storage/downloads` directory path overrides (`src/service.rs`) strictly to verified Termux environments (`is_termux_environment()`), preserving standard desktop Downloads paths on Linux and macOS.
+  - Exempted live TV streams and media lacking duration (`duration_seconds: None`) from the Continue Watching shelf (`src/history.rs`), preventing infinite in-progress shelf entries.
+  - Enforced 15MB file size limits (`MAX_PLAYLIST_BYTES`) on local M3U playlist file reads (`src/providers/tv/parser.rs`), preventing memory exhaustion when reading oversized local files.
+  - Suppressed background list scrollbars on Details screen (`src/tui/screens/details.rs`) and Home search results (`src/tui/screens/home.rs`) when modal overlays (such as synopsis description, download confirmation, or settings) are active, preventing bright purple scrollbar tracks from bleeding onto dimmed backdrop panes.
+  - Fixed subtitle proxy header duplication and conflicting MIME type bug (`src/proxy.rs`) by writing `Access-Control-Allow-Origin: *` and subtitle `Content-Type` outside the upstream header loop, stripping query parameters and case-normalizing URLs (`.srt`/`.vtt`) to override upstream generic content types and ensure clean single-header responses across media players.
+  - Corrected BDIX network probing in `src/tui/app/system.rs` by querying CircleFTP's active API route (`/api/posts`) instead of unrouted 404 `/api`, concurrently evaluating all DhakaFlix mirror endpoints (`172.16.50.7/14/12/9`), and preserving existing user-enabled mirror states across startup probes.
+
+- **External Player Launch Reliability & Crash Normalization**:
+  - Filtered false `PlayerCrashed` notifications when VLC exits with status code `1` and empty stderr (VLC normal exit / end of stream with `--play-and-exit`), and treated Unix `SIGTERM` signal termination as a clean user/OS-initiated quit.
+  - Eliminated process pipe deadlock and blocking thread leaks when media players spawn persistent background subprocesses by reading stderr concurrently with `child.wait()` and applying a 2-second drain timeout.
+  - Removed Windows Store App Execution Alias (`Microsoft\WindowsApps\vlc.exe`) from VLC candidate paths, preventing 0-byte reparse points from hijacking detection and failing launch.
+  - Emitted separate, independent `--http-header-fields` CLI arguments for mpv and IINA instead of comma-joining them, preventing header values with commas (cookies, MIME types) from being parsed into corrupted fragments.
+  - Added `~/Applications/IINA.app/Contents/MacOS/iina-cli` candidate path probe and surfaced diagnostic status warning when IINA falls back to `open -a IINA` without CLI argument support.
+
+- **Text Input Widget Cursor Truncation & Ellipsis Normalization**:
+  - Fixed double-ellipsis rendering (`"......"`) in single-line text inputs when text exceeds boundaries by retaining single-ellipsis trailing truncation and implementing reverse cursor-adjacent prefix truncation from the cursor backwards.
+
+- **Help Screen Scroll Indicator Math & Home Multi-Column Thumb Tracking**:
+  - Corrected denominator in single-column scroll position display in `src/tui/screens/help.rs` from `scroll + 1 / max_scroll` to `scroll + 1 / max_scroll + 1`, eliminating `11/10` display anomalies at bottom scroll boundaries.
+  - Synchronized search results scrollbar thumb position and viewport bounds in `src/tui/screens/home.rs` with calculated row coordinates (`div_ceil(columns)`) rather than raw linear item counts.
+
+- **Provider Quality Parsing & DhakaFlix ID Port Robustness**:
+  - Handled `"4k"` and `"2160p"` explicitly in `Release::resolution_u64` in `src/providers/models.rs`, preventing BDIX 4K releases from falling back to 1080p sort priority.
+  - Replaced colon-splitting in DhakaFlix ID parsing with `rfind(":/")` delimiter slicing in `src/providers/bdix/dhakaflix/client.rs`, preventing base URLs with explicit ports (`:8080`) from corrupting API path requests.
+
+- **Windows Process Group Isolation & Unix Signal Reporting**:
+  - Configured `CREATE_NEW_PROCESS_GROUP` on Windows in external player spawning (`playback.rs`), preventing terminal interrupt signals (Ctrl+C / Ctrl+Break) from terminating active external players.
+  - Inspected Unix exit status signals in `clean_player_error` when exit code is `None`, reporting informative diagnostics (`Player terminated by signal {sig}.`) instead of generic failure messages.
+  - Added `AppState::reset_details_view()` to reset selector panes, season/episode selections, and modal state when leaving Details screen, and aborted pending stream pool and episode prefetch tasks.
+
+### Performance
+- **Action Enum Footprint Reduction (73.6% Memory Reduction)**:
+  - Boxed `MediaDetails` in `Action::PreviewSuccess` and `Action::DetailsSuccess`, and boxed `WatchHistoryItem` in `Action::MarkWatched` and `Action::UpdateProgress`, reducing `Action` enum memory footprint from 424 bytes to 112 bytes across all event queues and channel messages.
+
+- **Zero-Allocation Addons Catalog Parsing & Stream Deserialization**:
+  - Centralized fallback catalog parsing in `parse_catalog_metas` in `src/providers/addons/client.rs` using `Value::take`, eliminating intermediate array cloning during catalog and stream deserialization.
+
+- **Theme ColorSupport Environment Probe Memoization**:
+  - Cached `ColorSupport::current()` via `std::sync::LazyLock` in `src/tui/theme.rs`, eliminating repeated inspection of terminal environment variables on every theme load and swatch render.
+
+- **Overview Modal Text Wrapping Deduplication**:
+  - Consolidated layout calculation and line wrapping in `draw_overview_modal` into a single pass, eliminating redundant duplicate text wrapping passes per frame.
+
+- **Browse Preset In-Place Sorting & Mouse Event Allocation Pruning**:
+  - Replaced full clone of `AppState::browse_metrics` during search result sorting with disjoint field borrows, eliminating heap allocations during browse ranking.
+  - Replaced deep clone of `MediaDetails` on every mouse event in the Details screen with borrowed field inspection.
+
+### Removed
+- **Dead Code and Obsolete Action Variants**:
+  - Removed unused `Action::LaunchPlayer` (consolidated into `Action::LaunchPlayback`), removed dead `selection_symbol` in Details screen, removed obsolete `_fourk_release` legacy check in MovieBox adapter, and replaced runtime `b64_decode` in MovieBox signing with a pre-computed byte literal.
+  - Consolidated duplicate text buffer keyboard navigation branches across download dir, addon URL, and TV playlist inputs into `TextInputBuffer::handle_key`.
+
 - **README Walkthrough Media Asset and Donate Anchor Focus**:
   - Updated the WebM walkthrough video attachment link to the latest asset URL across all localized READMEs and documentation.
   - Moved the `#optional-support` anchor target inside the collapsible `<details>` container with `tabindex="-1"`, enabling native browser ancestor-revealing and keyboard focus navigation to automatically expand the crypto donation section when clicking the Donate badge.

@@ -340,6 +340,8 @@ pub struct MetaVideo {
     pub number: Option<usize>,
     pub released: Option<String>,
     pub thumbnail: Option<String>,
+    pub overview: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

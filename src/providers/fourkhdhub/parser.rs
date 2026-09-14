@@ -243,6 +243,7 @@ fn parse_seasons(document: &Html) -> Result<Vec<Season>, FourKHdHubError> {
                 season,
                 number: episode,
                 title: None,
+                overview: None,
             });
     }
     Ok(seasons

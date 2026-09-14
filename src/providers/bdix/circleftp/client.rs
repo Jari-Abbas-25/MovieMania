@@ -28,11 +28,16 @@ impl Default for CircleFtpClient {
     }
 }
 
+pub const BASE_URL: &str = "http://new.circleftp.net:5000";
+pub const API_URL: &str = "http://new.circleftp.net:5000/api";
+pub const POSTS_URL: &str = "http://new.circleftp.net:5000/api/posts";
+pub const UPLOADS_URL: &str = "http://new.circleftp.net:5000/uploads/";
+
 impl CircleFtpClient {
     pub fn new() -> Self {
         Self {
             client: build_client(),
-            base_url: "http://new.circleftp.net:5000/api".to_string(),
+            base_url: API_URL.to_string(),
         }
     }
 
@@ -78,7 +83,7 @@ impl CircleFtpClient {
             .get("image")
             .or(json.get("imageSm"))
             .and_then(|v| v.as_str())
-            .map(|s| format!("http://new.circleftp.net:5000/uploads/{}", s));
+            .map(|s| format!("{UPLOADS_URL}{}", s));
 
         let mut seasons = Vec::new();
         if media_type == MediaType::Series {
@@ -95,6 +100,7 @@ impl CircleFtpClient {
                                 season: s_idx + 1,
                                 number: e_idx + 1,
                                 title: ep_title,
+                                overview: None,
                             });
                         }
                     }

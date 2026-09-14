@@ -375,7 +375,12 @@ impl App {
         if !force_refresh {
             if let Some(cached) = self.state.preview_cache.get(&id).cloned() {
                 self.action_sender
-                    .send(Action::DetailsSuccess(context, request_id, id, cached))
+                    .send(Action::DetailsSuccess(
+                        context,
+                        request_id,
+                        id,
+                        Box::new(cached),
+                    ))
                     .ok();
                 return;
             }
@@ -395,7 +400,7 @@ impl App {
                             context,
                             request_id,
                             id.clone(),
-                            cached,
+                            Box::new(cached),
                         ))
                         .ok();
                     return;
@@ -416,7 +421,12 @@ impl App {
                     })
                     .await;
                     sender
-                        .send(Action::DetailsSuccess(context, request_id, id, details))
+                        .send(Action::DetailsSuccess(
+                            context,
+                            request_id,
+                            id,
+                            Box::new(details),
+                        ))
                         .ok();
                 }
                 Err(error) => {
@@ -580,10 +590,11 @@ impl App {
         let Some(preset) = self.state.active_browse_preset else {
             return;
         };
-        let metrics = self.state.browse_metrics.clone();
         let metric = preset.metric();
         let descending = preset.descending();
-        self.state.search_results.sort_by(|left, right| {
+        let state = &mut self.state;
+        let metrics = &state.browse_metrics;
+        state.search_results.sort_by(|left, right| {
             let left_value = metrics
                 .get(&left.id)
                 .and_then(|values| values.value(metric));

@@ -1,8 +1,12 @@
 use super::artifact::{Release, ReleaseAsset};
 
-const OWNER: &str = "mesamirh";
-const REPOSITORY: &str = "MovieBox-Tui";
+pub const OWNER: &str = "mesamirh";
+pub const REPOSITORY: &str = "MovieBox-Tui";
 
+pub fn release_tag_url(tag: &str) -> String {
+    let tag_clean = tag.trim_start_matches('v');
+    format!("https://github.com/{OWNER}/{REPOSITORY}/releases/tag/v{tag_clean}")
+}
 pub async fn check_release(current: &str) -> Result<Option<Release>, String> {
     let release = match fetch_release().await {
         Ok(release) => release,

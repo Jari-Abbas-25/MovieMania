@@ -363,6 +363,7 @@ pub fn moviebox_details_json_to_media_details(
                             season: se_num,
                             number: ep_num as usize,
                             title: None,
+                            overview: None,
                         });
                     }
                 }
@@ -372,6 +373,7 @@ pub fn moviebox_details_json_to_media_details(
                         season: se_num,
                         number: ep_num,
                         title: None,
+                        overview: None,
                     });
                 }
             }
@@ -444,7 +446,6 @@ pub fn moviebox_details_json_to_media_details(
 pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
     if let Some(r) = item
         .get("_addon_release")
-        .or_else(|| item.get("_fourk_release"))
         .and_then(|val| serde_json::from_value::<Release>(val.clone()).ok())
     {
         return r;
@@ -703,7 +704,7 @@ pub fn moviebox_play_info_json_to_releases(
         let is_multi_res = is_dash || parsed_res_count > 1;
 
         let mut headers = vec![
-            ("Referer".to_string(), "https://sportslive.wine".to_string()),
+            ("Referer".to_string(), super::STREAM_REFERER.to_string()),
             ("User-Agent".to_string(), user_agent.to_string()),
         ];
         if !sign_cookie.is_empty() {
@@ -977,7 +978,7 @@ mod tests {
             mirror
                 .headers
                 .iter()
-                .any(|(k, v)| k == "Referer" && v == "https://sportslive.wine")
+                .any(|(k, v)| k == "Referer" && v == crate::providers::moviebox::STREAM_REFERER)
         );
         assert!(
             mirror

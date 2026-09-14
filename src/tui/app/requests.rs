@@ -709,7 +709,11 @@ impl App {
                     .await
                     {
                         sender
-                            .send(Action::PreviewSuccess(request_id, id_clone, cached_disk))
+                            .send(Action::PreviewSuccess(
+                                request_id,
+                                id_clone,
+                                Box::new(cached_disk),
+                            ))
                             .ok();
                         return;
                     }
@@ -725,7 +729,11 @@ impl App {
                             })
                             .await;
                             sender
-                                .send(Action::PreviewSuccess(request_id, id_clone, details))
+                                .send(Action::PreviewSuccess(
+                                    request_id,
+                                    id_clone,
+                                    Box::new(details),
+                                ))
                                 .ok();
                         }
                         Err(e) => {
@@ -760,8 +768,8 @@ impl App {
                     return None;
                 }
 
-                self.state.preview_cache.put(id.clone(), details.clone());
-                self.state.search_preview = Some(details.clone());
+                self.state.preview_cache.put(id.clone(), (*details).clone());
+                self.state.search_preview = Some((*details).clone());
                 self.state.poster_image = None;
                 self.state.poster_protocol = None;
                 if let Some(cached_img) = self.state.image_cache.get(&id) {
@@ -847,7 +855,8 @@ impl App {
                     .set_status_default(format!("Preview failed: {}", err));
             }
 
-            Action::DetailsSuccess(context, request_id, id, mut details) => {
+            Action::DetailsSuccess(context, request_id, id, details) => {
+                let mut details = *details;
                 if request_id != self.state.active_details_request {
                     return None;
                 }
@@ -972,6 +981,7 @@ impl App {
                             season: 1,
                             number: 1,
                             title: None,
+                            overview: None,
                         }],
                     }];
                 } else {

@@ -682,13 +682,14 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
         if wrapped_synopsis.len() > max_synopsis_lines {
             wrapped_synopsis.truncate(max_synopsis_lines);
             if let Some(last) = wrapped_synopsis.last_mut() {
-                let last_w = crate::tui::text::width(last);
-                if last_w + 3 <= text_width {
-                    last.push_str("...");
+                let hint = " ... [i]";
+                let hint_w = crate::tui::text::width(hint);
+                if crate::tui::text::width(last) + hint_w <= text_width {
+                    last.push_str(hint);
                 } else {
                     let truncated =
-                        crate::tui::text::truncate_width(last, text_width.saturating_sub(3));
-                    *last = format!("{truncated}...");
+                        crate::tui::text::truncate_width(last, text_width.saturating_sub(hint_w));
+                    *last = format!("{truncated}{hint}");
                 }
             }
         }
@@ -862,6 +863,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 state.language_list_state.selected().unwrap_or(0),
                 theme,
                 state.basic_terminal,
+                modal_active,
             );
         }
     }
@@ -922,6 +924,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 state.season_list_state.selected().unwrap_or(0),
                 theme,
                 state.basic_terminal,
+                modal_active,
             );
         }
 
@@ -1062,6 +1065,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
                 state.episode_list_state.selected().unwrap_or(0),
                 theme,
                 state.basic_terminal,
+                modal_active,
             );
         }
     }
@@ -1357,6 +1361,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
             selected_idx.unwrap_or(0),
             theme,
             state.basic_terminal,
+            modal_active,
         );
     } else {
         let has_multiple_dubs = details.has_languages();
@@ -1435,7 +1440,17 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &mut AppState, theme: &Theme) 
     .alignment(Alignment::Center);
     frame.render_widget(footer_p, footer_area);
 
-    if state.show_season_download_confirm {
+    if state.show_overview_modal {
+        crate::tui::overlay::overview_modal(
+            frame,
+            area,
+            &state.overview_modal_title,
+            &state.overview_modal_content,
+            state.overview_modal_scroll,
+            theme,
+            state.basic_terminal,
+        );
+    } else if state.show_season_download_confirm {
         let summary_strings = season_confirm_summary(state);
         let summary_lines: Vec<Line<'_>> = summary_strings
             .iter()
@@ -1692,7 +1707,7 @@ fn pane_styles(
                 unfocused_title_style(theme)
             },
             selection_style(focused, basic_terminal, theme),
-            selection_symbol(focused, basic_terminal),
+            "",
         )
     }
 }
@@ -1719,10 +1734,6 @@ fn selection_style(focused: bool, basic_terminal: bool, theme: &Theme) -> Style 
 
 fn focus_title_marker(basic_terminal: bool) -> &'static str {
     if basic_terminal { "> " } else { "› " }
-}
-
-fn selection_symbol(_focused: bool, _basic_terminal: bool) -> &'static str {
-    ""
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1991,6 +2002,7 @@ fn details_footer(
     if let Some(d) = d_label {
         primary.extend(footer_group("d", d, false, theme, modal_active));
     }
+    primary.extend(footer_group("i", "Info", false, theme, modal_active));
 
     let mut secondary = footer_group("f", fav_label, false, theme, modal_active);
     if show_provider {
@@ -2019,7 +2031,11 @@ fn render_scroll_indicator(
     position: usize,
     theme: &Theme,
     basic_terminal: bool,
+    modal_active: bool,
 ) {
+    if modal_active {
+        return;
+    }
     let scroll_area = area.inner(ratatui::layout::Margin {
         vertical: 1,
         horizontal: 0,
@@ -2502,16 +2518,19 @@ mod tests {
                             season: 1,
                             number: 1,
                             title: None,
+                            overview: None,
                         },
                         Episode {
                             season: 1,
                             number: 2,
                             title: None,
+                            overview: None,
                         },
                         Episode {
                             season: 1,
                             number: 10,
                             title: None,
+                            overview: None,
                         },
                     ],
                 }],
@@ -2524,16 +2543,19 @@ mod tests {
                         season: 1,
                         number: 1,
                         title: None,
+                        overview: None,
                     },
                     Episode {
                         season: 1,
                         number: 2,
                         title: None,
+                        overview: None,
                     },
                     Episode {
                         season: 1,
                         number: 10,
                         title: None,
+                        overview: None,
                     },
                 ],
             }],
@@ -2713,7 +2735,7 @@ mod tests {
                 duration: Some("45m".to_string()),
                 seasons: vec![Season {
                     number: 1,
-                    episodes: (1..=7).map(|n| Episode { season: 1, number: n, title: None }).collect(),
+                    episodes: (1..=7).map(|n| Episode { season: 1, number: n, title: None, overview: None }).collect(),
                 }],
                 dubs: vec![
                     AudioTrackOption { subject_id: "1".to_string(), language: "Original".to_string(), label: "Original".to_string() },
@@ -2724,7 +2746,7 @@ mod tests {
             }),
             available_seasons: vec![Season {
                 number: 1,
-                episodes: (1..=7).map(|n| Episode { season: 1, number: n, title: None }).collect(),
+                episodes: (1..=7).map(|n| Episode { season: 1, number: n, title: None, overview: None }).collect(),
             }],
             available_episode_numbers: vec![vec![1, 2, 3]],
             details_pane: crate::tui::state::DetailsPane::Languages,
@@ -3188,5 +3210,205 @@ mod tests {
                 }
             }
         }
+    }
+    #[test]
+    fn test_details_scrollbars_hidden_when_overview_modal_active() {
+        let backend = ratatui::backend::TestBackend::new(120, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let dubs = (0..10)
+            .map(|i| AudioTrackOption {
+                subject_id: format!("dub-{i}"),
+                language: format!("Lang {i}"),
+                label: format!("Lang {i}"),
+            })
+            .collect();
+        let mut state = AppState {
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "sample".to_string(),
+                },
+                title: "Sample Movie".to_string(),
+                media_type: MediaType::Movie,
+                year: Some("2024".to_string()),
+                description: Some("Synopsis".to_string()),
+                tagline: None,
+                imdb_rating: None,
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: None,
+                genres: vec![],
+                seasons: vec![],
+                dubs,
+            }),
+            show_overview_modal: false,
+            basic_terminal: false,
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer_without_modal = terminal.backend().buffer().clone();
+        let symbols_without_modal = buffer_without_modal
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(symbols_without_modal.contains('▲'));
+        assert!(symbols_without_modal.contains('█'));
+
+        state.show_overview_modal = true;
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer_with_modal = terminal.backend().buffer().clone();
+        let symbols_with_modal = buffer_with_modal
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(!symbols_with_modal.contains('▲'));
+        assert!(!symbols_with_modal.contains('█'));
+    }
+
+    #[test]
+    fn test_active_overview_resolution_series_and_episodes() {
+        let mut state = AppState {
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "series_1".to_string(),
+                },
+                title: "Test Series".to_string(),
+                media_type: MediaType::Series,
+                year: Some("2024".to_string()),
+                description: Some("Full series description here.".to_string()),
+                tagline: None,
+                imdb_rating: None,
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: None,
+                genres: vec![],
+                seasons: vec![Season {
+                    number: 1,
+                    episodes: vec![
+                        Episode {
+                            season: 1,
+                            number: 1,
+                            title: Some("Pilot Episode".to_string()),
+                            overview: Some("Episode 1 overview text.".to_string()),
+                        },
+                        Episode {
+                            season: 1,
+                            number: 2,
+                            title: None,
+                            overview: None,
+                        },
+                    ],
+                }],
+                dubs: vec![],
+            }),
+            available_seasons: vec![Season {
+                number: 1,
+                episodes: vec![
+                    Episode {
+                        season: 1,
+                        number: 1,
+                        title: Some("Pilot Episode".to_string()),
+                        overview: Some("Episode 1 overview text.".to_string()),
+                    },
+                    Episode {
+                        season: 1,
+                        number: 2,
+                        title: None,
+                        overview: None,
+                    },
+                ],
+            }],
+            available_episode_numbers: vec![vec![1, 2]],
+            details_pane: crate::tui::state::DetailsPane::Languages,
+            ..Default::default()
+        };
+
+        let (series_title, series_desc) = state.active_overview().unwrap();
+        assert_eq!(series_title, "Test Series · Synopsis");
+        assert_eq!(series_desc, "Full series description here.");
+
+        state.details_pane = crate::tui::state::DetailsPane::Episodes;
+        state.episode_list_state.select(Some(0));
+
+        let (ep_title, ep_desc) = state.active_overview().unwrap();
+        assert_eq!(ep_title, "Test Series · S01E01 · Pilot Episode");
+        assert_eq!(ep_desc, "Episode 1 overview text.");
+
+        state.episode_list_state.select(Some(1));
+        let (ep2_title, ep2_desc) = state.active_overview().unwrap();
+        assert_eq!(ep2_title, "Test Series · Synopsis");
+        assert_eq!(ep2_desc, "Full series description here.");
+    }
+
+    #[test]
+    fn test_overview_modal_renders_in_details_screen() {
+        let backend = ratatui::backend::TestBackend::new(100, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        let mut state = AppState {
+            selected_details: Some(MediaDetails {
+                id: ProviderMediaId {
+                    provider: ProviderKind::MovieBox,
+                    value: "sample".to_string(),
+                },
+                title: "Sample Movie".to_string(),
+                media_type: MediaType::Movie,
+                year: Some("2024".to_string()),
+                description: Some("Short synopsis".to_string()),
+                tagline: None,
+                imdb_rating: None,
+                director: None,
+                stars: None,
+                prints: None,
+                audios: None,
+                poster_url: None,
+                duration: None,
+                genres: vec![],
+                seasons: vec![],
+                dubs: vec![],
+            }),
+            show_overview_modal: true,
+            overview_modal_title: "Test Movie · Synopsis".to_string(),
+            overview_modal_content: "This is the complete movie summary rendered inside modal."
+                .to_string(),
+            ..Default::default()
+        };
+        let theme = Theme::mocha();
+
+        terminal
+            .draw(|frame| {
+                draw(frame, frame.area(), &mut state, &theme);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(content.contains("Test Movie · Synopsis"));
+        assert!(content.contains("complete movie summary rendered"));
+        assert!(!content.contains("[Esc] Close"));
     }
 }

@@ -79,10 +79,11 @@ impl WatchHistoryItem {
         if self.progress_seconds < 30 {
             return false;
         }
-        if let Some(dur) = self.duration_seconds {
-            if dur > 0 && self.progress_seconds >= (dur as f64 * 0.90) as u64 {
-                return false;
-            }
+        let Some(dur) = self.duration_seconds else {
+            return false;
+        };
+        if dur == 0 || self.progress_seconds >= (dur as f64 * 0.90) as u64 {
+            return false;
         }
         true
     }
@@ -795,5 +796,18 @@ mod tests {
         assert!(!state_file.exists());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+    #[test]
+    fn test_history_item_live_stream_without_duration_not_in_progress() {
+        let mut item = dummy_item("tv", "live_1", "BBC News", 1, "", 0, 0);
+        item.duration_seconds = None;
+        item.progress_seconds = 600;
+        assert!(!item.is_in_progress());
+
+        item.duration_seconds = Some(0);
+        assert!(!item.is_in_progress());
+
+        item.duration_seconds = Some(3600);
+        assert!(item.is_in_progress());
     }
 }

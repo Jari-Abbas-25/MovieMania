@@ -100,6 +100,7 @@ pub struct Episode {
     pub season: usize,
     pub number: usize,
     pub title: Option<String>,
+    pub overview: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -237,7 +238,13 @@ impl Release {
     pub fn resolution_u64(&self) -> u64 {
         self.quality
             .as_deref()
-            .and_then(|q| q.trim_end_matches('p').parse::<u64>().ok())
+            .and_then(|q| {
+                let trimmed = q.trim();
+                if trimmed.eq_ignore_ascii_case("4k") || trimmed.eq_ignore_ascii_case("uhd") {
+                    return Some(2160);
+                }
+                trimmed.trim_end_matches(['p', 'P']).parse::<u64>().ok()
+            })
             .unwrap_or(1080)
     }
 
@@ -367,4 +374,32 @@ pub fn extract_4digit_year(raw: &str) -> String {
         .and_then(|window| std::str::from_utf8(window).ok())
         .map(str::to_string)
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_release_resolution_parsing() {
+        let make_release = |q: Option<&str>| Release {
+            provider: ProviderKind::BdixCircleFtp,
+            filename: "Test.mkv".to_string(),
+            quality: q.map(|s| s.to_string()),
+            codec: None,
+            language: None,
+            size_bytes: None,
+            season: None,
+            episode: None,
+            mirrors: Vec::new(),
+            resource_id: None,
+        };
+
+        assert_eq!(make_release(Some("4K")).resolution_u64(), 2160);
+        assert_eq!(make_release(Some("4k")).resolution_u64(), 2160);
+        assert_eq!(make_release(Some("2160p")).resolution_u64(), 2160);
+        assert_eq!(make_release(Some("1080p")).resolution_u64(), 1080);
+        assert_eq!(make_release(Some("720p")).resolution_u64(), 720);
+        assert_eq!(make_release(None).resolution_u64(), 1080);
+    }
 }

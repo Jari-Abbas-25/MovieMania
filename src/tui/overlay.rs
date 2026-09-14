@@ -128,6 +128,75 @@ pub fn download_confirm_action_row(popup: Rect, summary_lines: usize) -> u16 {
     (popup.y + summary_lines as u16 + 1).min(popup.bottom().saturating_sub(1))
 }
 
+pub fn overview_modal_layout_with_wrapped(area: Rect, content: &str) -> (Rect, Vec<String>) {
+    let available_w = area.width.saturating_sub(4);
+    let width = 72u16.min(available_w).max(36);
+    let inner_w = width.saturating_sub(4) as usize;
+    let wrapped = crate::tui::text::wrap_text(content, inner_w);
+    let content_lines = wrapped.len();
+    let desired_h = (content_lines as u16 + 2).max(4);
+    let max_h = area.height.saturating_sub(2).max(4);
+    let height = desired_h.min(max_h);
+    let popup = centered(area, width, height, 36, width);
+    (popup, wrapped)
+}
+
+pub fn overview_modal_layout(area: Rect, content: &str) -> (Rect, usize) {
+    let (popup, wrapped) = overview_modal_layout_with_wrapped(area, content);
+    (popup, wrapped.len())
+}
+
+pub fn overview_modal(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    content: &str,
+    scroll_offset: usize,
+    theme: &Theme,
+    basic_terminal: bool,
+) -> Rect {
+    let (popup, wrapped) = overview_modal_layout_with_wrapped(area, content);
+    let total_lines = wrapped.len();
+    clear_modal_area(frame, area, popup, theme);
+    let inner_h = popup.height.saturating_sub(2) as usize;
+
+    let has_scroll = total_lines > inner_h;
+
+    let title_line = Line::from(vec![
+        Span::raw(" "),
+        Span::styled(title, theme.title.add_modifier(Modifier::BOLD)),
+        Span::raw(" "),
+    ]);
+
+    let mut block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(border_type(basic_terminal))
+        .border_style(theme.surface1)
+        .padding(ratatui::widgets::Padding::new(1, 1, 0, 0))
+        .title(title_line)
+        .title_alignment(Alignment::Left);
+
+    if has_scroll {
+        block = block.title_bottom(
+            Line::from(vec![Span::styled(" [↑/↓] Scroll ", theme.subtext1)])
+                .alignment(Alignment::Right),
+        );
+    }
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let lines: Vec<Line> = wrapped
+        .into_iter()
+        .map(|line| Line::from(Span::styled(line, theme.text)))
+        .collect();
+
+    let paragraph = Paragraph::new(lines).scroll((scroll_offset as u16, 0));
+    frame.render_widget(paragraph, inner);
+
+    popup
+}
+
 pub fn picker(
     frame: &mut Frame,
     area: Rect,
@@ -402,12 +471,7 @@ pub fn notifications(
             )]));
         }
 
-        let total_duration = match notification.kind {
-            NotificationKind::Info => std::time::Duration::from_secs(4),
-            NotificationKind::Success => std::time::Duration::from_secs(5),
-            NotificationKind::Warning => std::time::Duration::from_secs(7),
-            NotificationKind::Error => std::time::Duration::from_secs(10),
-        };
+        let total_duration = notification.kind.total_duration();
         let remaining = notification
             .expires_at
             .saturating_duration_since(std::time::Instant::now());
@@ -912,6 +976,22 @@ mod tests {
         assert_eq!(layout.width, 26);
         let inner_width = layout.width.saturating_sub(2);
         assert_eq!(inner_width, 24);
+    }
+
+    #[test]
+    fn test_overview_modal_layout_bounds_and_lines() {
+        let standard_area = Rect::new(0, 0, 80, 24);
+        let short_content = "A brief synopsis.";
+        let (short_popup, short_lines) = overview_modal_layout(standard_area, short_content);
+        assert_eq!(short_lines, 1);
+        assert!(short_popup.width <= 76);
+        assert!(short_popup.height >= 4);
+
+        let long_content =
+            "This is a much longer overview describing the story in great detail. ".repeat(20);
+        let (long_popup, long_lines) = overview_modal_layout(standard_area, &long_content);
+        assert!(long_lines > 10);
+        assert_eq!(long_popup.height, 22);
     }
 
     #[test]

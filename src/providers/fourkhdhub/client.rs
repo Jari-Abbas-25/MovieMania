@@ -3,7 +3,7 @@ use crate::providers::models::{CatalogItem, MediaDetails, PlaybackSource, Provid
 use reqwest::Url;
 
 const DEFAULT_BASE_URL: &str = "https://4khdhub.one/";
-const BROWSER_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const BROWSER_UA: &str = crate::net::DEFAULT_BROWSER_USER_AGENT;
 
 #[derive(thiserror::Error, Debug)]
 pub enum FourKHdHubError {

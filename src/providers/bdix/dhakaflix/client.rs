@@ -68,7 +68,7 @@ fn quality_score(name: &str) -> u8 {
     }
 }
 
-const SERVERS: &[(&str, &str)] = &[
+pub const SERVERS: &[(&str, &str)] = &[
     ("http://172.16.50.7", "/DHAKA-FLIX-7/"),
     ("http://172.16.50.14", "/DHAKA-FLIX-14/"),
     ("http://172.16.50.12", "/DHAKA-FLIX-12/"),
@@ -94,7 +94,7 @@ impl DhakaFlixClient {
         Self {
             client: crate::net::http_client_builder()
                 .timeout(Duration::from_secs(5))
-                .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .user_agent(crate::net::DEFAULT_BROWSER_USER_AGENT)
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new()),
             recent_fails: Arc::new(RwLock::new(HashMap::new())),
@@ -236,10 +236,7 @@ impl DhakaFlixClient {
             let client = self.client.clone();
 
             async move {
-                let parts: Vec<&str> = id.split(':').collect();
-                if parts.len() >= 3 {
-                    let base_url = parts[0..2].join(":");
-                    let path = parts[2..].join(":");
+                if let Some((base_url, path)) = parse_dhakaflix_id(&id) {
                     let path_parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
                     if !path_parts.is_empty() {
                         let api_href = format!("/{}/", path_parts[0]);
@@ -292,10 +289,8 @@ impl DhakaFlixClient {
     }
 
     pub async fn details(&self, id: &str) -> Result<MediaDetails, DhakaFlixError> {
-        let parts: Vec<&str> = id.split(':').collect();
         let mut title = "Unknown".to_string();
-        if parts.len() >= 3 {
-            let path = parts[2..].join(":");
+        if let Some((_, path)) = parse_dhakaflix_id(id) {
             let path_parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
             if let Some(name) = path_parts.last() {
                 title = percent_encoding::percent_decode_str(name)
@@ -332,13 +327,9 @@ impl DhakaFlixClient {
     pub async fn streams(&self, id: &str) -> Result<Vec<Release>, DhakaFlixError> {
         let mut releases = Vec::new();
 
-        let parts: Vec<&str> = id.split(':').collect();
-        if parts.len() < 3 {
+        let Some((base_url, path)) = parse_dhakaflix_id(id) else {
             return Ok(releases);
-        }
-
-        let base_url = parts[0..2].join(":");
-        let path = parts[2..].join(":");
+        };
         let path_parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
 
         if path_parts.last().is_some() {
@@ -426,5 +417,34 @@ impl DhakaFlixClient {
 
     pub async fn resolve_release(&self, resolver_url: &str) -> Result<String, DhakaFlixError> {
         Ok(resolver_url.to_string())
+    }
+}
+
+fn parse_dhakaflix_id(id: &str) -> Option<(&str, &str)> {
+    if let Some(pos) = id.rfind(":/") {
+        Some((&id[..pos], &id[pos + 1..]))
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_dhakaflix_id_with_port() {
+        let (base, path) =
+            parse_dhakaflix_id("http://172.16.50.4:8080:/movies/action/film.mkv").unwrap();
+        assert_eq!(base, "http://172.16.50.4:8080");
+        assert_eq!(path, "/movies/action/film.mkv");
+    }
+
+    #[test]
+    fn test_parse_dhakaflix_id_without_port() {
+        let (base, path) =
+            parse_dhakaflix_id("http://172.16.50.4:/movies/action/film.mkv").unwrap();
+        assert_eq!(base, "http://172.16.50.4");
+        assert_eq!(path, "/movies/action/film.mkv");
     }
 }

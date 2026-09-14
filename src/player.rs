@@ -3,6 +3,17 @@ pub mod tracker;
 use std::{path::Path, process::Command};
 
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+pub const ENV_MOVIEBOX_PLAYER: &str = "MOVIEBOX_PLAYER";
+
+#[cfg(not(target_os = "windows"))]
+pub const STANDARD_UNIX_BIN_DIRS: &[&str] = &[
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    "/run/current-system/sw/bin",
+    "/data/data/com.termux/files/usr/bin",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerKind {
@@ -145,10 +156,12 @@ fn build_player_process_command(executable: &str) -> Command {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::enum_variant_names)]
 enum AndroidOpener {
     TermuxOpen(String),
     TermuxOpenUrl(String),
     TermuxAm(String),
+    #[cfg(target_os = "android")]
     SystemAm(String),
 }
 
@@ -163,6 +176,7 @@ fn probe_android_opener() -> Option<AndroidOpener> {
         }
     }
 
+    #[cfg(target_os = "android")]
     let is_termux = crate::updater::artifact::is_termux_environment();
 
     if let Ok(prefix) = std::env::var("PREFIX") {
@@ -180,19 +194,26 @@ fn probe_android_opener() -> Option<AndroidOpener> {
         }
     }
 
-    let termux_am_static = "/data/data/com.termux/files/usr/bin/termux-am";
-    if Path::new(termux_am_static).is_file() {
-        return Some(AndroidOpener::TermuxAm(termux_am_static.to_string()));
+    let termux_am_static = format!(
+        "{}/bin/termux-am",
+        crate::updater::artifact::TERMUX_PREFIX_USR
+    );
+    if Path::new(&termux_am_static).is_file() {
+        return Some(AndroidOpener::TermuxAm(termux_am_static));
     }
-    let termux_open_static = "/data/data/com.termux/files/usr/bin/termux-open";
-    if Path::new(termux_open_static).is_file() {
-        return Some(AndroidOpener::TermuxOpen(termux_open_static.to_string()));
+    let termux_open_static = format!(
+        "{}/bin/termux-open",
+        crate::updater::artifact::TERMUX_PREFIX_USR
+    );
+    if Path::new(&termux_open_static).is_file() {
+        return Some(AndroidOpener::TermuxOpen(termux_open_static));
     }
-    let termux_open_url_static = "/data/data/com.termux/files/usr/bin/termux-open-url";
-    if Path::new(termux_open_url_static).is_file() {
-        return Some(AndroidOpener::TermuxOpenUrl(
-            termux_open_url_static.to_string(),
-        ));
+    let termux_open_url_static = format!(
+        "{}/bin/termux-open-url",
+        crate::updater::artifact::TERMUX_PREFIX_USR
+    );
+    if Path::new(&termux_open_url_static).is_file() {
+        return Some(AndroidOpener::TermuxOpenUrl(termux_open_url_static));
     }
 
     if let Some(path) = find_in_path("termux-am") {
@@ -204,12 +225,9 @@ fn probe_android_opener() -> Option<AndroidOpener> {
     if let Some(path) = find_in_path("termux-open-url") {
         return Some(AndroidOpener::TermuxOpenUrl(path));
     }
+    #[cfg(target_os = "android")]
     if !is_termux {
-        #[cfg(target_os = "android")]
         let is_root = unsafe { libc::getuid() == 0 };
-        #[cfg(not(target_os = "android"))]
-        let is_root = true;
-
         if is_root {
             if Path::new("/system/bin/am").is_file() {
                 return Some(AndroidOpener::SystemAm("/system/bin/am".to_string()));
@@ -219,7 +237,6 @@ fn probe_android_opener() -> Option<AndroidOpener> {
             }
         }
     }
-
     None
 }
 
@@ -297,6 +314,7 @@ fn android_intent_command(
             append_android_intent_extras(&mut cmd, subtitle, headers);
             cmd
         }
+        #[cfg(target_os = "android")]
         Some(AndroidOpener::SystemAm(path)) => {
             let mut cmd = Command::new(path);
             cmd.arg("start")
@@ -381,16 +399,10 @@ fn mpv_command(
                 command.arg(format!("{prefix}referrer={value}"));
             }
         }
-        let fields = headers
-            .iter()
-            .filter(|(name, _)| {
-                !name.eq_ignore_ascii_case("user-agent") && !name.eq_ignore_ascii_case("referer")
-            })
-            .map(|(name, value)| format!("{name}: {value}"))
-            .collect::<Vec<_>>()
-            .join(",");
-        if !fields.is_empty() {
-            command.arg(format!("{prefix}http-header-fields={fields}"));
+        for (name, value) in headers {
+            if !name.eq_ignore_ascii_case("user-agent") && !name.eq_ignore_ascii_case("referer") {
+                command.arg(format!("{prefix}http-header-fields={name}: {value}"));
+            }
         }
 
         let ytdl_headers = headers
@@ -433,6 +445,10 @@ fn probe_iina_resolution() -> Option<IinaResolution> {
         return Some(IinaResolution::Cli(cli_global.to_string()));
     }
     if let Some(home) = dirs::home_dir() {
+        let user_cli = home.join("Applications/IINA.app/Contents/MacOS/iina-cli");
+        if user_cli.exists() {
+            return Some(IinaResolution::Cli(user_cli.to_string_lossy().into_owned()));
+        }
         let nix_iina = home.join(".nix-profile/bin/iina-cli");
         if nix_iina.exists() {
             return Some(IinaResolution::Cli(nix_iina.to_string_lossy().into_owned()));
@@ -518,6 +534,16 @@ fn iina_command(
         command.arg(arg);
     }
     command
+}
+
+#[cfg(target_os = "macos")]
+pub fn iina_is_app_fallback() -> bool {
+    matches!(iina_resolution(), Some(IinaResolution::AppFallback))
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn iina_is_app_fallback() -> bool {
+    false
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -852,7 +878,6 @@ pub fn windows_vlc_candidate_paths(
     }
 
     if let Some(local) = localappdata {
-        candidates.push(format!(r"{local}\Microsoft\WindowsApps\vlc.exe"));
         candidates.push(format!(r"{local}\Microsoft\WinGet\Links\vlc.exe"));
         candidates.push(format!(r"{local}\Programs\VLC\vlc.exe"));
         candidates.push(format!(r"{local}\Programs\VideoLAN\VLC\vlc.exe"));
@@ -1112,7 +1137,7 @@ fn mpv_executable() -> Option<String> {
 
     if let Ok(guard) = CACHED.read() {
         if let Some(path) = &*guard {
-            if Path::new(path).is_file() {
+            if path.starts_with("flatpak run ") || Path::new(path).is_file() {
                 return Some(path.clone());
             }
         }
@@ -1132,7 +1157,7 @@ fn vlc_executable() -> Option<String> {
 
     if let Ok(guard) = CACHED.read() {
         if let Some(path) = &*guard {
-            if Path::new(path).is_file() {
+            if path.starts_with("flatpak run ") || Path::new(path).is_file() {
                 return Some(path.clone());
             }
         }
@@ -1240,15 +1265,7 @@ pub(crate) fn find_in_path(name: &str) -> Option<String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let standard_unix_dirs = [
-            "/opt/homebrew/bin",
-            "/usr/local/bin",
-            "/usr/bin",
-            "/bin",
-            "/run/current-system/sw/bin",
-            "/data/data/com.termux/files/usr/bin",
-        ];
-        for d in standard_unix_dirs {
+        for d in STANDARD_UNIX_BIN_DIRS {
             let p = std::path::PathBuf::from(d);
             if !paths_to_search.contains(&p) {
                 paths_to_search.push(p);
@@ -1425,6 +1442,32 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(args.contains(&r"--sub-file=\\server\share\subs\sub.srt".into()));
     }
+    #[test]
+    fn mpv_command_passes_multiple_header_fields_individually() {
+        let headers = vec![
+            ("Cookie".to_string(), "session=abc, token=123".to_string()),
+            ("Accept".to_string(), "text/html, */*".to_string()),
+            ("User-Agent".to_string(), "CustomUA".to_string()),
+            ("Referer".to_string(), "https://example.com/".to_string()),
+        ];
+        let cmd = mpv_command(
+            "https://example.com/video.mp4",
+            None,
+            &headers,
+            false,
+            None,
+            None,
+            None,
+        );
+        let args = cmd
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(args.contains(&"--user-agent=CustomUA".to_string()));
+        assert!(args.contains(&"--referrer=https://example.com/".to_string()));
+        assert!(args.contains(&"--http-header-fields=Cookie: session=abc, token=123".to_string()));
+        assert!(args.contains(&"--http-header-fields=Accept: text/html, */*".to_string()));
+    }
 
     #[test]
     fn header_support_allows_android_cookies_and_vlc_proxy() {
@@ -1550,11 +1593,7 @@ mod tests {
                 .iter()
                 .any(|c| c.contains("Program Files") && c.contains("vlc.exe"))
         );
-        assert!(
-            candidates
-                .iter()
-                .any(|c| c.contains("WindowsApps") && c.contains("vlc.exe"))
-        );
+        assert!(!candidates.iter().any(|c| c.contains("WindowsApps")));
         assert!(
             candidates
                 .iter()

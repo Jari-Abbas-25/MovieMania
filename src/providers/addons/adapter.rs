@@ -38,6 +38,8 @@ pub fn meta_to_search_result(item: &MetaItem) -> SearchResult {
     }
 }
 
+type SeasonEpisodeMap = BTreeMap<usize, BTreeMap<usize, (Option<String>, Option<String>)>>;
+
 pub fn meta_to_catalog_item(item: &MetaItem) -> CatalogItem {
     let is_series = item.r#type.eq_ignore_ascii_case("series")
         || item.r#type.eq_ignore_ascii_case("tv")
@@ -81,18 +83,17 @@ pub fn meta_detail_to_media_details(detail: &MetaDetail) -> MediaDetails {
         || detail.r#type.eq_ignore_ascii_case("anime")
         || !detail.videos.is_empty();
 
-    let mut season_map: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    let mut season_map: SeasonEpisodeMap = BTreeMap::new();
     for video in &detail.videos {
         let s = video.season.unwrap_or(1);
-        let e = video.episode.unwrap_or(1);
-        let eps = season_map.entry(s).or_default();
-        if !eps.contains(&e) {
-            eps.push(e);
-        }
-    }
-
-    for eps in season_map.values_mut() {
-        eps.sort_unstable();
+        let e = video.episode.or(video.number).unwrap_or(1);
+        let ep_title = video.title.clone().or_else(|| video.name.clone());
+        let ep_overview = video.overview.clone().or_else(|| video.description.clone());
+        season_map
+            .entry(s)
+            .or_default()
+            .entry(e)
+            .or_insert((ep_title, ep_overview));
     }
 
     let seasons = season_map
@@ -101,10 +102,11 @@ pub fn meta_detail_to_media_details(detail: &MetaDetail) -> MediaDetails {
             number: season_num,
             episodes: eps
                 .into_iter()
-                .map(|ep_num| Episode {
+                .map(|(ep_num, (ep_title, ep_overview))| Episode {
                     season: season_num,
                     number: ep_num,
-                    title: None,
+                    title: ep_title,
+                    overview: ep_overview,
                 })
                 .collect(),
         })
@@ -691,6 +693,8 @@ mod tests {
                     number: None,
                     released: None,
                     thumbnail: None,
+                    overview: Some("Pilot episode overview".to_string()),
+                    description: None,
                 },
                 super::super::models::MetaVideo {
                     id: Some("ep2".to_string()),
@@ -701,6 +705,8 @@ mod tests {
                     number: None,
                     released: None,
                     thumbnail: None,
+                    overview: None,
+                    description: None,
                 },
             ],
         };
@@ -715,5 +721,10 @@ mod tests {
         assert_eq!(media.seasons.len(), 1);
         assert_eq!(media.seasons[0].number, 1);
         assert_eq!(media.seasons[0].episodes.len(), 2);
+        assert_eq!(
+            media.seasons[0].episodes[0].overview.as_deref(),
+            Some("Pilot episode overview")
+        );
+        assert_eq!(media.seasons[0].episodes[0].title.as_deref(), Some("Pilot"));
     }
 }

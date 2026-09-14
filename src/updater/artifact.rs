@@ -69,12 +69,13 @@ impl TargetPlatform {
         }
     }
 }
+pub const TERMUX_PREFIX_USR: &str = "/data/data/com.termux/files/usr";
 
 pub fn is_termux_environment() -> bool {
     cfg!(target_os = "android")
         || std::env::var("TERMUX_VERSION").is_ok()
         || std::env::var("PREFIX").is_ok_and(|p| p.contains("com.termux"))
-        || std::path::Path::new("/data/data/com.termux/files/usr").exists()
+        || std::path::Path::new(TERMUX_PREFIX_USR).exists()
 }
 
 impl Release {

@@ -291,7 +291,7 @@ impl MovieBoxService {
         let response = self
             .http_client
             .get(url)
-            .header("User-Agent", "MovieBox-Tui/1.0")
+            .header("User-Agent", crate::net::APP_HTTP_USER_AGENT)
             .send()
             .await
             .ok()?
@@ -463,10 +463,12 @@ pub fn resolve_download_dir(custom_dir: Option<&Path>) -> PathBuf {
         .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
         .unwrap_or_else(|| PathBuf::from("."));
 
-    if let Some(home) = dirs::home_dir() {
-        let android_storage = home.join("storage/downloads");
-        if android_storage.exists() {
-            return ensure_moviebox_subdir(&android_storage);
+    if crate::updater::artifact::is_termux_environment() {
+        if let Some(home) = dirs::home_dir() {
+            let android_storage = home.join("storage/downloads");
+            if android_storage.exists() {
+                return ensure_moviebox_subdir(&android_storage);
+            }
         }
     }
 

@@ -167,6 +167,16 @@ pub enum NotificationKind {
     Error,
 }
 
+impl NotificationKind {
+    pub fn total_duration(&self) -> Duration {
+        match self {
+            NotificationKind::Info => Duration::from_secs(4),
+            NotificationKind::Success => Duration::from_secs(5),
+            NotificationKind::Warning => Duration::from_secs(7),
+            NotificationKind::Error => Duration::from_secs(10),
+        }
+    }
+}
 #[derive(Debug, Clone)]
 pub struct Notification {
     pub kind: NotificationKind,
@@ -181,12 +191,7 @@ impl Notification {
         title: impl Into<String>,
         message: impl Into<String>,
     ) -> Self {
-        let duration = match kind {
-            NotificationKind::Info => Duration::from_secs(4),
-            NotificationKind::Success => Duration::from_secs(5),
-            NotificationKind::Warning => Duration::from_secs(7),
-            NotificationKind::Error => Duration::from_secs(10),
-        };
+        let duration = kind.total_duration();
         Self {
             kind,
             title: title.into(),

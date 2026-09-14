@@ -26,7 +26,7 @@ file path, and the app parses, groups, dedupes, and lets you search and play the
 ## Parsing and search
 
 `src/providers/tv/` parses each source (http(s) or local file), extracting channel id,
-name, logo, `group-title`, and stream URL. Playlist lines are pre-counted to preallocate vector capacity, eliminating dynamic heap reallocations during large 50,000+ channel imports. Channels are **deduped by stream URL**
+name, logo, `group-title`, and stream URL. Playlist lines are pre-counted to preallocate vector capacity, eliminating dynamic heap reallocations during large 50,000+ channel imports. Both remote downloads and local files enforce a maximum 15MB size limit (`MAX_PLAYLIST_BYTES`), rejecting oversized playlists before parsing to prevent memory exhaustion. Channels are **deduped by stream URL**
 across all playlists. The search box filters by name or group; the status bar reports
 how many channels were imported and which playlists failed.
 
@@ -34,7 +34,7 @@ how many channels were imported and which playlists failed.
 
 `Enter` on a channel launches the default player with the channel URL (via the same
 `launch_player` path as movies). Channel logos are cached under the `iptv` image
-namespace.
+namespace. Live streams without a finite duration (`duration_seconds: None`) are automatically exempted from the in-progress Continue Watching shelf, preventing unfinishable entries from accumulating in watch history.
 
 ## Commands in TV mode
 

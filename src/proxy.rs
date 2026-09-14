@@ -343,31 +343,8 @@ async fn handle_connection(
         return Ok(());
     }
 
-    for (header_name, header_val) in upstream_res.headers() {
-        let name_str = header_name.as_str();
-        if name_str.eq_ignore_ascii_case("content-type")
-            || name_str.eq_ignore_ascii_case("content-length")
-            || name_str.eq_ignore_ascii_case("content-range")
-            || name_str.eq_ignore_ascii_case("accept-ranges")
-        {
-            if let Ok(val_str) = header_val.to_str() {
-                writer
-                    .write_all(format!("{name_str}: {val_str}\r\n").as_bytes())
-                    .await?;
-            }
-        }
-        writer
-            .write_all(b"Access-Control-Allow-Origin: *\r\n")
-            .await?;
-        if target_url.ends_with(".srt") {
-            writer
-                .write_all(b"Content-Type: application/x-subrip\r\n")
-                .await?;
-        } else if target_url.ends_with(".vtt") {
-            writer.write_all(b"Content-Type: text/vtt\r\n").await?;
-        }
-    }
-    writer.write_all(b"Connection: close\r\n\r\n").await?;
+    let headers_bytes = format_proxy_response_headers(upstream_res.headers(), &target_url);
+    writer.write_all(&headers_bytes).await?;
 
     let mut stream = upstream_res.bytes_stream();
     loop {
@@ -383,6 +360,47 @@ async fn handle_connection(
     writer.flush().await?;
 
     Ok(())
+}
+fn format_proxy_response_headers(
+    headers: &reqwest::header::HeaderMap,
+    target_url: &str,
+) -> Vec<u8> {
+    let mut out = Vec::new();
+    let clean_path = target_url
+        .split('?')
+        .next()
+        .unwrap_or("")
+        .split('#')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let is_srt = clean_path.ends_with(".srt");
+    let is_vtt = clean_path.ends_with(".vtt");
+
+    for (header_name, header_val) in headers {
+        let name_str = header_name.as_str();
+        if (is_srt || is_vtt) && name_str.eq_ignore_ascii_case("content-type") {
+            continue;
+        }
+        if name_str.eq_ignore_ascii_case("content-type")
+            || name_str.eq_ignore_ascii_case("content-length")
+            || name_str.eq_ignore_ascii_case("content-range")
+            || name_str.eq_ignore_ascii_case("accept-ranges")
+        {
+            if let Ok(val_str) = header_val.to_str() {
+                out.extend_from_slice(format!("{name_str}: {val_str}\r\n").as_bytes());
+            }
+        }
+    }
+
+    out.extend_from_slice(b"Access-Control-Allow-Origin: *\r\n");
+    if is_srt {
+        out.extend_from_slice(b"Content-Type: application/x-subrip\r\n");
+    } else if is_vtt {
+        out.extend_from_slice(b"Content-Type: text/vtt\r\n");
+    }
+    out.extend_from_slice(b"Connection: close\r\n\r\n");
+    out
 }
 
 fn extract_target_url(path_and_query: &str) -> Option<String> {
@@ -540,5 +558,53 @@ mod tests {
             rewritten.contains("http://127.0.0.1:9999/https/cdn.example.com:8080/dash/seg.mp4"),
             "Port must be preserved in proxy route"
         );
+    }
+    #[test]
+    fn test_format_proxy_response_headers_for_srt_with_query_and_case() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("content-type", "text/plain".parse().unwrap());
+        headers.insert("content-length", "1234".parse().unwrap());
+        headers.insert("accept-ranges", "bytes".parse().unwrap());
+        headers.insert("server", "cloudflare".parse().unwrap());
+
+        let url = "https://cdn.example.com/subs.SRT?token=abc123&expires=999#top";
+        let out = String::from_utf8(format_proxy_response_headers(&headers, url)).unwrap();
+
+        assert_eq!(out.matches("Access-Control-Allow-Origin: *").count(), 1);
+        assert_eq!(out.matches("Content-Type: application/x-subrip").count(), 1);
+        assert_eq!(out.matches("Connection: close").count(), 1);
+        assert!(!out.contains("text/plain"));
+        assert!(out.contains("content-length: 1234"));
+        assert!(out.contains("accept-ranges: bytes"));
+    }
+
+    #[test]
+    fn test_format_proxy_response_headers_for_vtt() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("content-type", "application/octet-stream".parse().unwrap());
+        headers.insert("content-length", "500".parse().unwrap());
+
+        let url = "https://cdn.example.com/subs.vtt";
+        let out = String::from_utf8(format_proxy_response_headers(&headers, url)).unwrap();
+
+        assert_eq!(out.matches("Access-Control-Allow-Origin: *").count(), 1);
+        assert_eq!(out.matches("Content-Type: text/vtt").count(), 1);
+        assert!(!out.contains("application/octet-stream"));
+        assert!(out.contains("content-length: 500"));
+    }
+
+    #[test]
+    fn test_format_proxy_response_headers_for_media_stream() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("content-type", "video/mp4".parse().unwrap());
+        headers.insert("content-length", "10000000".parse().unwrap());
+
+        let url = "https://cdn.example.com/video.mp4";
+        let out = String::from_utf8(format_proxy_response_headers(&headers, url)).unwrap();
+
+        assert_eq!(out.matches("Access-Control-Allow-Origin: *").count(), 1);
+        assert!(out.contains("content-type: video/mp4"));
+        assert!(!out.contains("application/x-subrip"));
+        assert!(!out.contains("text/vtt"));
     }
 }

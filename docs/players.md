@@ -7,9 +7,9 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 
 `player::detect()` (powered by a centralized `probe_player_executable` engine) returns players in priority order, resolving paths dynamically with non-negative caching:
 
-- macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, MacPorts `/opt/local/bin`, Nix profiles `~/.nix-profile/bin` and `/run/current-system/sw/bin`, and standard `/bin`).
+- macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, MacPorts `/opt/local/bin`, Nix profiles `~/.nix-profile/bin` and `/run/current-system/sw/bin`, standard `/bin`, and embedded app bundles `/Applications/IINA.app/Contents/MacOS/iina-cli` and `~/Applications/IINA.app/Contents/MacOS/iina-cli`).
 - Linux: mpv, then VLC (probing native `$PATH`, user `.local/bin`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, Nix profiles, standard `/bin`, and `flatpak run`).
-- Windows: mpv, then VLC (probing executable-adjacent binaries, WinGet Links & Packages directory `%LOCALAPPDATA%\Microsoft\WinGet\Packages`, `%USERPROFILE%\Downloads` and `%USERPROFILE%\Desktop` extractions, `Program Files` including `mpv`, `mpv-player`, `mpv.net`, and `VideoLAN\VLC`, `LOCALAPPDATA\Programs`, portable drive roots `C:\mpv`, `C:\vlc`, `C:\tools`, Scoop shims & apps, Chocolatey, and Windows Registry `App Paths` and `Environment\Path`).
+- Windows: mpv, then VLC (probing executable-adjacent binaries, WinGet Links & Packages directory `%LOCALAPPDATA%\Microsoft\WinGet\Packages`, `%USERPROFILE%\Downloads` and `%USERPROFILE%\Desktop` extractions, `Program Files` including `mpv`, `mpv-player`, `mpv.net`, and `VideoLAN\VLC`, `LOCALAPPDATA\Programs`, portable drive roots `C:\mpv`, `C:\vlc`, `C:\tools`, Scoop shims & apps, Chocolatey, and Windows Registry `App Paths` and `Environment\Path`; zero-byte Windows Store App Execution Aliases in `WindowsApps` are intentionally excluded).
 - Android/Termux: Android intent chooser (`termux-open`, `termux-open-url`, or `termux-am`), prioritized at index 0 ahead of CLI `mpv` and `vlc` to avoid selecting headless players lacking display servers. Streams play via external Android video players.
 
 Resolution caches detected paths across runs while allowing newly installed players to be discovered dynamically when opening or navigating the Settings Hub (`/settings`), without requiring an application restart. A preferred player can be forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`, `vlc`, `android`), which reorders the list. The media player picker in the Settings Hub lists every detected player on your system and saves your selection to `config.json`. Playback launches directly using the preferred compatible player without intermediate modal dialogs.
@@ -18,9 +18,9 @@ Resolution caches detected paths across runs while allowing newly installed play
 
 | Player          | Invocation                                                                                                                                | Notes                                                                                                  |
 | :--- | :--- | :--- |
-| mpv             | `mpv --autofit=WxH --geometry=50%:50% --idle=no --keep-open=no [--start=..] [--script=..] [--script-opts=..] [--http-header-fields=..] [--sub-file=..] <url>` | Window sized to the terminal. Injects `moviebox_tracker.lua` for position tracking and resume. Flatpak mpv is launched via `flatpak run`. |
+| mpv             | `mpv --autofit=WxH --geometry=50%:50% --idle=no --keep-open=no [--start=..] [--script=..] [--script-opts=..] [--http-header-fields=..] [--sub-file=..] <url>` | Window sized to the terminal. Injects `moviebox_tracker.lua` for position tracking and resume. Each non-UA, non-Referer header is passed as a separate `--http-header-fields` argument. Flatpak mpv is launched via `flatpak run`. |
 | VLC             | `vlc --width=W --height=H --play-and-exit [--start-time=..] [--http-referrer=..] [--http-user-agent=..] [--sub-file=..] <url>` | Supports start time resume via `--start-time`. For CloudFront cookie-gated streams (MovieBox DASH), the URL is replaced by a loopback sidecar proxy address (`http://127.0.0.1:<port>/https/<host>/path`) that injects all auth headers server-side before forwarding chunks to VLC. |
-| IINA            | `iina-cli --keep-running --no-stdin --mpv-autofit=.. [--mpv-start=..] --mpv-http-header-fields=.. --mpv-sub-files=.. <url>`               | Uses the installed IINA `iina-cli`; falls back to `open -a IINA <url>` only if the CLI is absent.      |
+| IINA            | `iina-cli --keep-running --no-stdin --mpv-autofit=.. [--mpv-start=..] [--mpv-http-header-fields=..] [--mpv-sub-files=..] <url>`               | Uses the installed IINA `iina-cli`; falls back to `open -a IINA <url>` with an informational status warning if the CLI is absent. |
 | Android / Termux | `termux-open --chooser --content-type video/* <url>` (or `termux-open-url` / `termux-am`) | Opens an app chooser on the device, delegating playback to external apps (VLC, MX Player, Just Player, MPV Android). Requires `pkg install -y termux-tools termux-am`. Forwards `User-Agent`, `Referer`, and subtitles when using `termux-am`. |
 
 Window size is derived from the live terminal size times the font cell size reported
@@ -55,9 +55,13 @@ When launching media with in-progress watch history, the player command automati
 
 `launch_player` spawns the player with null stdin, piped stderr (plus piped stdout for
 `PlayerKind::AndroidIntent` to intercept intent dispatcher error text), and its own
-process group (Unix) or no-console flag (Windows). A blocking task reads output and
-reports every non-zero process exit as a player error, surfacing compact, actionable
-diagnostics on mobile terminals. Watch progress is reconciled only after a successful exit.
+process group (Unix `process_group(0)`) or no-console flag (Windows `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP`).
+
+- **Concurrent Stderr Drain & Pipe Deadlock Prevention**: Stderr is read in a background thread concurrently with `child.wait()`, bounded by a 2-second timeout after process exit. This breaks pipe deadlocks when players (such as VLC with audio or output plugins) fork background subprocesses that inherit the pipe.
+- **Clean Exit Normalization**: Routine exit states are normalized to avoid false crash reports:
+  - VLC exit code `1` with empty stderr (normal stream completion under `--play-and-exit`) is classified as clean exit (`PlayerExited`).
+  - Unix `SIGTERM` (signal 15) termination when the user closes player windows via the OS is treated as clean exit.
+  - Genuine non-zero failures with stderr diagnostics are surfaced as actionable player errors. Watch progress is reconciled only after a successful exit.
 
 ## Android / Termux Playback Architecture
 
@@ -72,4 +76,4 @@ On Android (Termux), terminal sessions do not have access to an X11 or Wayland d
   - **Missing video player app**: Surfaces `No Video Player` (`Install a video player on Android.`).
   - **Missing intent bridge / socket**: Surfaces `Termux Setup Needed` (`Run: pkg install -y termux-am`).
   - **Headless CLI mpv**: Detects video output initialization failures and surfaces `CLI mpv Unsupported` (`Switch to Android Player in /settings.`).
-  - **SELinux & Exit Code 126 Protection**: On Android 10+, executing `/system/bin/am` directly from an unrooted Termux environment causes Android's system shell to call `cmd activity`, which is blocked by SELinux when executing Termux app data binaries (`Permission denied`, exit code 126). MovieBox-TUI detects Termux environments, prevents illegal system `am` invocations, preserves `LD_PRELOAD` for Termux applet compatibility, and surfaces actionable remediation notifications.
+  - **SELinux & Exit Code 126 Protection**: On Android 10+, executing `/system/bin/am` directly from an unrooted Termux environment causes Android's system shell to call `cmd activity`, which is blocked by SELinux when executing Termux app data binaries (`Permission denied`, exit code 126). MovieBox-TUI detects Termux environments, prevents illegal system `am` invocations, preserves `LD_PRELOAD` for Termux applet compatibility, strictly gates system `am` checks behind `target_os = "android"` (preventing GNU Automake collisions on desktop Linux), and surfaces actionable remediation notifications.

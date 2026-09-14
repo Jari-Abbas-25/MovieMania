@@ -25,7 +25,7 @@ impl App {
             return PlaybackResolution::NoPlayersInstalled;
         }
 
-        let preferred = std::env::var("MOVIEBOX_PLAYER")
+        let preferred = std::env::var(crate::player::ENV_MOVIEBOX_PLAYER)
             .ok()
             .and_then(|value| crate::tui::state::PlayerKind::parse(&value))
             .or_else(|| {
@@ -369,6 +369,7 @@ impl App {
                     }
                     Err(err) => {
                         log::error!("Failed to spawn stream proxy sidecar: {err}");
+                        let _ = sender.send(Action::PlayerExited);
                         let _ = sender.send(Action::SetStatus(format!(
                             "Stream proxy initialization failed: {err}"
                         )));
@@ -388,6 +389,14 @@ impl App {
                 resume_seconds,
                 tracker_ref,
             );
+            if kind == crate::tui::state::PlayerKind::Iina
+                && crate::player::iina_is_app_fallback()
+                && (!headers.is_empty() || subtitle.is_some())
+            {
+                let _ = sender.send(Action::SetStatus(
+                    "IINA opened without iina-cli: headers and subtitles unavailable.".to_string(),
+                ));
+            }
             let capture_stdout = matches!(kind, crate::tui::state::PlayerKind::AndroidIntent);
             command.stdin(std::process::Stdio::null());
             if capture_stdout {
@@ -402,6 +411,11 @@ impl App {
                 use std::os::unix::process::CommandExt;
                 command.process_group(0);
             }
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x0000_0200);
+            }
 
             match command.spawn() {
                 Ok(mut child) => {
@@ -411,23 +425,33 @@ impl App {
 
                     tokio::task::spawn_blocking(move || {
                         let mut error_output = String::new();
+                        let (stderr_tx, stderr_rx) = std::sync::mpsc::channel::<String>();
+                        if let Some(mut stderr) = stderr_stream {
+                            std::thread::spawn(move || {
+                                let mut buf = String::new();
+                                use std::io::Read;
+                                let _ = stderr.read_to_string(&mut buf);
+                                let _ = stderr_tx.send(buf);
+                            });
+                        } else {
+                            drop(stderr_tx);
+                        }
+
                         if let Some(mut stdout) = stdout_stream {
                             use std::io::Read;
                             let _ = stdout.read_to_string(&mut error_output);
                         }
-                        if let Some(mut stderr) = stderr_stream {
-                            use std::io::Read;
-                            let mut stderr_output = String::new();
-                            let _ = stderr.read_to_string(&mut stderr_output);
-                            if !stderr_output.is_empty() {
-                                if !error_output.is_empty() {
-                                    error_output.push('\n');
-                                }
-                                error_output.push_str(&stderr_output);
-                            }
-                        }
 
                         let result = child.wait();
+                        let stderr_str = stderr_rx
+                            .recv_timeout(std::time::Duration::from_secs(2))
+                            .unwrap_or_default();
+                        if !stderr_str.is_empty() {
+                            if !error_output.is_empty() {
+                                error_output.push('\n');
+                            }
+                            error_output.push_str(&stderr_str);
+                        }
 
                         match result {
                             Ok(status) if status.success() => {
@@ -456,7 +480,7 @@ impl App {
                                         });
                                         sender
                                             .send(Action::UpdateProgress {
-                                                item,
+                                                item: Box::new(item),
                                                 progress,
                                                 duration,
                                                 completed,
@@ -465,9 +489,26 @@ impl App {
                                     }
                                 }
                             }
+                            Ok(status)
+                                if is_vlc_normal_exit(kind, status.code(), error_output.trim())
+                                    || is_user_quit(&status) =>
+                            {
+                                log::info!(
+                                    "player {:?} exited cleanly (code: {:?})",
+                                    kind,
+                                    status.code()
+                                );
+                            }
                             Ok(status) => {
+                                #[cfg(unix)]
+                                let signal = {
+                                    use std::os::unix::process::ExitStatusExt;
+                                    status.signal()
+                                };
+                                #[cfg(not(unix))]
+                                let signal = None;
                                 let clean_error =
-                                    clean_player_error(status.code(), error_output.trim());
+                                    clean_player_error(status.code(), signal, error_output.trim());
                                 sender
                                     .send(Action::PlayerCrashed(status.code(), clean_error))
                                     .ok();
@@ -509,14 +550,41 @@ impl App {
         });
     }
 }
+fn is_vlc_normal_exit(
+    kind: crate::tui::state::PlayerKind,
+    code: Option<i32>,
+    stderr: &str,
+) -> bool {
+    matches!(kind, crate::tui::state::PlayerKind::Vlc)
+        && (code == Some(1) || code == Some(0))
+        && stderr.is_empty()
+}
 
-fn clean_player_error(code: Option<i32>, stderr: &str) -> String {
+fn is_user_quit(status: &std::process::ExitStatus) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        status.signal() == Some(15)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = status;
+        false
+    }
+}
+
+fn clean_player_error(code: Option<i32>, signal: Option<i32>, stderr: &str) -> String {
     if !stderr.is_empty() {
         return stderr.to_string();
     }
 
-    code.map(|value| format!("Player exited with status code {value}."))
-        .unwrap_or_else(|| "Player exited unsuccessfully without error output.".to_string())
+    if let Some(value) = code {
+        format!("Player exited with status code {value}.")
+    } else if let Some(sig) = signal {
+        format!("Player terminated by signal {sig}.")
+    } else {
+        "Player exited unsuccessfully without error output.".to_string()
+    }
 }
 
 impl App {
@@ -597,12 +665,14 @@ impl App {
                                 }
                                 Ok(Err(error)) => {
                                     log::error!("4KHDHub resolve failed: {error}");
+                                    sender.send(Action::PlayerExited).ok();
                                     sender
                                         .send(Action::SetStatus(format!("Error: 4KHDHub: {error}")))
                                         .ok();
                                 }
                                 Err(_) => {
                                     log::error!("4KHDHub resolve timed out");
+                                    sender.send(Action::PlayerExited).ok();
                                     sender
                                         .send(Action::SetStatus(
                                             "Error: 4KHDHub stream resolution timed out. Select another release (e.g. 1080p) or press Ctrl+P for MovieBox.".to_string(),
@@ -774,21 +844,6 @@ impl App {
                 }
             }
 
-            Action::LaunchPlayer(kind, link, sub) => {
-                self.state.is_resolving_playback = false;
-                self.state.player_picker_popup = false;
-                self.state.last_playback_launch = std::time::Instant::now();
-                if let Some(mut source) = self.state.pending_playback_source.take() {
-                    source.subtitle = sub;
-                    self.launch_player(kind, source.url, source.subtitle, source.headers);
-                } else {
-                    let headers = vec![(
-                        "User-Agent".to_string(),
-                        self.service.client.user_agent().to_string(),
-                    )];
-                    self.launch_player(kind, link, sub, headers);
-                }
-            }
             Action::LaunchPlayback(kind, source) => {
                 self.state.is_resolving_playback = false;
                 self.state.player_picker_popup = false;
@@ -807,7 +862,7 @@ impl App {
                 self.dispatch_playback_or_notify(source);
             }
             Action::MarkWatched(item) => {
-                self.state.history.mark_watched(item);
+                self.state.history.mark_watched(*item);
                 let history = self.state.history.clone();
                 tokio::task::spawn_blocking(move || history.save());
             }
@@ -819,7 +874,7 @@ impl App {
             } => {
                 self.state
                     .history
-                    .update_progress(item, progress, duration, completed);
+                    .update_progress(*item, progress, duration, completed);
             }
             Action::ReconcileHistory => {
                 self.state.history.reconcile_pending_playback_states();
@@ -910,7 +965,7 @@ mod tests {
     #[test]
     fn failed_player_with_stderr_keeps_diagnostic() {
         assert_eq!(
-            clean_player_error(Some(1), "VLC failed to open the stream"),
+            clean_player_error(Some(1), None, "VLC failed to open the stream"),
             "VLC failed to open the stream"
         );
     }
@@ -918,13 +973,31 @@ mod tests {
     #[test]
     fn failed_player_without_stderr_still_reports_failure() {
         assert_eq!(
-            clean_player_error(Some(1), ""),
+            clean_player_error(Some(1), None, ""),
             "Player exited with status code 1."
         );
         assert_eq!(
-            clean_player_error(None, ""),
+            clean_player_error(None, Some(9), ""),
+            "Player terminated by signal 9."
+        );
+        assert_eq!(
+            clean_player_error(None, None, ""),
             "Player exited unsuccessfully without error output."
         );
+    }
+
+    #[test]
+    fn vlc_exit_code_1_empty_stderr_is_normal_exit() {
+        use crate::tui::state::PlayerKind;
+        assert!(super::is_vlc_normal_exit(PlayerKind::Vlc, Some(1), ""));
+        assert!(super::is_vlc_normal_exit(PlayerKind::Vlc, Some(0), ""));
+        assert!(!super::is_vlc_normal_exit(
+            PlayerKind::Vlc,
+            Some(1),
+            "Error opening stream"
+        ));
+        assert!(!super::is_vlc_normal_exit(PlayerKind::Mpv, Some(1), ""));
+        assert!(!super::is_vlc_normal_exit(PlayerKind::Vlc, Some(2), ""));
     }
 
     #[tokio::test]

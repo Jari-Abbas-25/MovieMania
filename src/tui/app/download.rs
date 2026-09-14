@@ -252,7 +252,8 @@ impl App {
                     .arg(&link);
                 #[cfg(target_os = "windows")]
                 {
-                    cmd.creation_flags(crate::player::CREATE_NO_WINDOW);
+                    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+                    cmd.creation_flags(crate::player::CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
                 }
                 cmd.kill_on_drop(true);
                 cmd.stdout(std::process::Stdio::piped());

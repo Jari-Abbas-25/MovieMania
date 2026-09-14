@@ -35,24 +35,32 @@ pub fn build_help_columns(
     left.push(help_row("↑ / ↓", "Navigate rows & lists", theme));
     left.push(help_row("← / →", "Step search card columns", theme));
     left.push(help_row("Tab / S-Tab", "Switch tabs & detail panes", theme));
-    left.push(help_row("Home / End", "Jump to start / end of list", theme));
-    left.push(help_row("PgUp / PgDn", "Scroll one page up / down", theme));
-    left.push(help_row("Esc / c", "Clear search / back / dismiss", theme));
+    left.push(help_row(
+        "Home / End",
+        "Jump to start / end of search",
+        theme,
+    ));
+    left.push(help_row(
+        "PgUp / PgDn",
+        "Scroll search results / pages",
+        theme,
+    ));
+    left.push(help_row("Esc", "Go back or dismiss popups", theme));
+    left.push(help_row("c", "Clear search query (Home)", theme));
     left.push(help_row("Ctrl+U", "Clear entire search input", theme));
-    left.push(help_row("Ctrl+W", "Delete previous word", theme));
     left.push(Line::from(""));
 
     if state.is_tv_mode {
         left.push(help_section_header("TV Actions", theme));
         left.push(help_row("Enter", "Play selected channel", theme));
-        left.push(help_row("d / Delete", "Delete selected playlist", theme));
+        left.push(help_row("d / Del", "Remove playlist (TV config)", theme));
         left.push(help_row("r", "Reload M3U playlists", theme));
-        left.push(help_row("/list", "Browse all TV channels", theme));
     } else {
         left.push(help_section_header("Streaming Actions", theme));
         left.push(help_row("Enter", "Play selected release", theme));
-        left.push(help_row("Space / P", "Direct resume playback", theme));
-        left.push(help_row("d / Delete", "Download or remove history", theme));
+        left.push(help_row("Space / P", "Resume (deck / history)", theme));
+        left.push(help_row("d", "Download episode / season", theme));
+        left.push(help_row("Del", "Remove from history", theme));
         left.push(help_row("f", "Favorite / unfavorite title", theme));
         left.push(help_row(
             "Ctrl+P",
@@ -121,7 +129,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
         let end = (scroll + capacity).min(all_lines.len());
         let window: Vec<Line> = all_lines[scroll..end].to_vec();
         let position = if max_scroll > 0 {
-            format!(" · {}/{}", scroll + 1, max_scroll)
+            format!(" · {}/{}", scroll + 1, max_scroll + 1)
         } else {
             String::new()
         };
@@ -194,7 +202,8 @@ mod tests {
         assert!(left_text.contains("Navigation"));
         assert!(left_text.contains("Streaming Actions"));
         assert!(left_text.contains("Play selected release"));
-        assert!(left_text.contains("Download or remove history"));
+        assert!(left_text.contains("Download episode / season"));
+        assert!(left_text.contains("Remove from history"));
 
         assert!(right_text.contains("Content Modes"));
         assert!(right_text.contains("Commands & Shortcuts"));

@@ -25,12 +25,7 @@ pub fn category_tab_rects(
 
     for cat in SettingsCategory::ALL {
         let title = if compact {
-            match cat {
-                SettingsCategory::General => "1:Gen",
-                SettingsCategory::ContentModes => "2:Modes",
-                SettingsCategory::Appearance => "3:Theme",
-                SettingsCategory::StorageInfo => "4:Info",
-            }
+            cat.compact_title()
         } else {
             cat.title()
         };
@@ -170,12 +165,7 @@ fn render_tabs(frame: &mut Frame, area: Rect, popup_area: Rect, state: &AppState
         }
         let is_active = *cat == state.settings_category;
         let title = if compact {
-            match cat {
-                SettingsCategory::General => "1:Gen",
-                SettingsCategory::ContentModes => "2:Modes",
-                SettingsCategory::Appearance => "3:Theme",
-                SettingsCategory::StorageInfo => "4:Info",
-            }
+            cat.compact_title()
         } else {
             cat.title()
         };
@@ -415,8 +405,8 @@ fn render_general_settings(frame: &mut Frame, area: Rect, state: &AppState, them
         let value_spans = if let Some(input) = &state.settings_download_dir_input {
             let cursor_char = if state.basic_terminal { "_" } else { "▌" };
             let input_str = input.as_str();
-            let cursor_idx = input.cursor().min(input_str.len());
-            let (before, after) = input_str.split_at(cursor_idx);
+            let cursor_offset = input.cursor_byte_offset();
+            let (before, after) = input_str.split_at(cursor_offset);
             let input_budget = (row_area.width as usize).saturating_sub(21).clamp(10, 60);
             let truncated_before =
                 crate::tui::text::truncate_width(before, input_budget.saturating_sub(4));
@@ -1058,5 +1048,16 @@ mod tests {
         let popup = Rect::new(4, 4, 76, 17);
         let rows = settings_row_rects(popup, SettingsCategory::Appearance);
         assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn test_settings_download_input_multibyte_utf8_cursor_split() {
+        use crate::tui::text::TextInputBuffer;
+        let mut input = TextInputBuffer::from_str("C:\\Users\\山田\\Downloads");
+        input.set_cursor(11);
+        let offset = input.cursor_byte_offset();
+        let (before, after) = input.as_str().split_at(offset);
+        assert_eq!(before, "C:\\Users\\山田");
+        assert_eq!(after, "\\Downloads");
     }
 }

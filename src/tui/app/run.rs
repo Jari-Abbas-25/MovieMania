@@ -57,7 +57,7 @@ impl App {
         {
             self.state.default_player = Some(first.config_key().to_string());
         }
-        let preferred = std::env::var("MOVIEBOX_PLAYER")
+        let preferred = std::env::var(crate::player::ENV_MOVIEBOX_PLAYER)
             .ok()
             .and_then(|value| crate::tui::state::PlayerKind::parse(&value))
             .or_else(|| {
@@ -457,7 +457,6 @@ impl App {
             | Action::ShowDownloadSubtitlePopup(..)
             | Action::LaunchPlayback(..)
             | Action::DispatchPlayback(..)
-            | Action::LaunchPlayer(..)
             | Action::MarkWatched(..)
             | Action::UpdateProgress { .. }
             | Action::ReconcileHistory

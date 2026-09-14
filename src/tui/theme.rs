@@ -121,16 +121,19 @@ pub enum ColorSupport {
 }
 impl ColorSupport {
     pub fn current() -> Self {
-        if std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty()) {
-            return ColorSupport::NoColor;
-        }
-        if std::env::var("WT_SESSION").is_ok() {
-            return ColorSupport::Truecolor;
-        }
-        let colorterm = std::env::var("COLORTERM").unwrap_or_default();
-        let term = std::env::var("TERM").unwrap_or_default();
-        let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
-        classify_terminal(&colorterm, &term, &term_program)
+        static CACHED: std::sync::LazyLock<ColorSupport> = std::sync::LazyLock::new(|| {
+            if std::env::var("NO_COLOR").is_ok_and(|v| !v.is_empty()) {
+                return ColorSupport::NoColor;
+            }
+            if std::env::var("WT_SESSION").is_ok() {
+                return ColorSupport::Truecolor;
+            }
+            let colorterm = std::env::var("COLORTERM").unwrap_or_default();
+            let term = std::env::var("TERM").unwrap_or_default();
+            let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
+            classify_terminal(&colorterm, &term, &term_program)
+        });
+        *CACHED
     }
     pub fn label(&self) -> &'static str {
         match self {

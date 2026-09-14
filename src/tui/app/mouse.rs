@@ -296,8 +296,7 @@ impl App {
                             self.action_sender.send(Action::StartSelfUpdate).ok();
                         }
                     } else if col < layout.open_btn_end_x {
-                        let url =
-                            format!("https://github.com/mesamirh/MovieBox-Tui/releases/tag/v{ver}");
+                        let url = crate::updater::check::release_tag_url(ver);
                         let _ = open::that(&url);
                     }
                     self.state.update_available = None;
@@ -353,6 +352,16 @@ impl App {
                         );
                     }
                 }
+            }
+            return true;
+        }
+        if self.state.show_overview_modal {
+            let (popup, _) = crate::tui::overlay::overview_modal_layout(
+                area,
+                &self.state.overview_modal_content,
+            );
+            if !popup.contains(ratatui::layout::Position::new(col, row)) {
+                self.state.close_overview_modal();
             }
             return true;
         }
@@ -968,10 +977,14 @@ impl App {
     }
 
     fn handle_details_mouse(&mut self, col: u16, row: u16, area: Rect) -> Option<Action> {
-        let details = self.state.selected_details.as_ref()?.clone();
-
-        let has_languages = details.has_languages();
-        let is_series = details.is_series() && !self.state.available_seasons.is_empty();
+        let (has_languages, is_series, dubs_count) = {
+            let details = self.state.selected_details.as_ref()?;
+            (
+                details.has_languages(),
+                details.is_series() && !self.state.available_seasons.is_empty(),
+                details.dubs.len(),
+            )
+        };
 
         let mut available_panes = Vec::new();
         if has_languages {
@@ -995,12 +1008,22 @@ impl App {
             self.handle_details_footer_click(col, row - footer_area.y, area.width);
             return None;
         }
+        if layout
+            .header_area
+            .contains(ratatui::layout::Position::new(col, row))
+        {
+            if let Some((title, content)) = self.state.series_synopsis() {
+                self.state.open_overview_modal(title, content);
+                return None;
+            }
+        }
 
         if workflow_area.height > 0 && row == workflow_area.y {
+            let details = self.state.selected_details.as_ref()?;
             let (_, ranges) = crate::tui::screens::details::workflow_step_ranges(
                 area.width,
                 &self.state,
-                &details,
+                details,
                 has_languages,
                 is_series,
                 streams_count,
@@ -1028,7 +1051,7 @@ impl App {
                 .available_episode_numbers
                 .get(self.state.season_list_state.selected().unwrap_or(0))
                 .map_or(0, Vec::len);
-            let language_count = details.dubs.len();
+            let language_count = dubs_count;
             language_count
                 .max(self.state.available_seasons.len())
                 .max(episode_count)
@@ -1060,7 +1083,7 @@ impl App {
                     match pane {
                         DetailsPane::Languages => {
                             self.state.details_pane = DetailsPane::Languages;
-                            if clicked_row < details.dubs.len() {
+                            if clicked_row < dubs_count {
                                 self.action_sender
                                     .send(Action::SelectLanguage(clicked_row))
                                     .ok();
@@ -1159,6 +1182,7 @@ impl App {
             Favorite,
             StreamsTab,
             Back,
+            Info,
         }
 
         let mut primary: Vec<(FooterAction, u16)> = Vec::new();
@@ -1168,11 +1192,13 @@ impl App {
             primary.push((FooterAction::PlaySelect, 7 + 1 + 4));
             let d_label_len = if compact { 4 } else { 8 };
             primary.push((FooterAction::Download, 3 + 1 + d_label_len));
+            primary.push((FooterAction::Info, 3 + 1 + 4));
             secondary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         } else if is_languages {
             primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
             primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
+            primary.push((FooterAction::Info, 3 + 1 + 4));
             secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         } else if is_seasons {
@@ -1180,6 +1206,7 @@ impl App {
             let d_label_len = if compact { 8 } else { 15 };
             primary.push((FooterAction::Download, 3 + 1 + d_label_len));
             primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
+            primary.push((FooterAction::Info, 3 + 1 + 4));
             secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         } else if is_episodes {
@@ -1187,12 +1214,14 @@ impl App {
             let d_label_len = if compact { 8 } else { 16 };
             primary.push((FooterAction::Download, 3 + 1 + d_label_len));
             primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
+            primary.push((FooterAction::Info, 3 + 1 + 4));
             secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         } else {
             primary.push((FooterAction::PlaySelect, 7 + 1 + 6));
             primary.push((FooterAction::Favorite, 3 + 1 + fav_label_len));
             secondary.push((FooterAction::StreamsTab, 5 + 1 + 7));
+            primary.push((FooterAction::Info, 3 + 1 + 4));
             secondary.push((FooterAction::Back, 5 + 1 + 4));
         }
         let active_buttons =
@@ -1235,6 +1264,11 @@ impl App {
                     }
                     FooterAction::Favorite => {
                         self.action_sender.send(Action::ToggleFavorite).ok();
+                    }
+                    FooterAction::Info => {
+                        if let Some((title, content)) = self.state.active_overview() {
+                            self.state.open_overview_modal(title, content);
+                        }
                     }
                     FooterAction::StreamsTab => {
                         self.action_sender.send(Action::TabPane).ok();
@@ -1502,5 +1536,54 @@ mod tests {
         assert!(!app.state.subtitle_popup);
         let notif = app.state.notifications.back().expect("notification posted");
         assert_eq!(notif.title, "Playback Cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_details_header_mouse_click_opens_overview_modal_and_outside_click_dismisses() {
+        let mut app = App::new();
+        let area = Rect::new(0, 0, 100, 30);
+        app.state.active_screen = Screen::Details;
+        app.state.selected_details = Some(crate::providers::models::MediaDetails {
+            id: crate::providers::models::ProviderMediaId {
+                provider: crate::providers::models::ProviderKind::MovieBox,
+                value: "sample_series".to_string(),
+            },
+            title: "Stranger Things".to_string(),
+            media_type: crate::providers::models::MediaType::Series,
+            year: Some("2016".to_string()),
+            description: Some("Full synopsis about the Upside Down.".to_string()),
+            tagline: None,
+            imdb_rating: None,
+            director: None,
+            stars: None,
+            prints: None,
+            audios: None,
+            poster_url: None,
+            duration: None,
+            genres: vec![],
+            seasons: vec![],
+            dubs: vec![],
+        });
+
+        assert!(!app.state.show_overview_modal);
+
+        let layout = crate::tui::screens::details::details_screen_layout(
+            area,
+            app.state.selected_details.as_ref(),
+        );
+        let header_click_x = layout.header_area.x + 2;
+        let header_click_y = layout.header_area.y + 2;
+        app.handle_details_mouse(header_click_x, header_click_y, area);
+
+        assert!(app.state.show_overview_modal);
+        assert_eq!(app.state.overview_modal_title, "Stranger Things · Synopsis");
+        assert_eq!(
+            app.state.overview_modal_content,
+            "Full synopsis about the Upside Down."
+        );
+
+        let outside_handled = app.handle_overlay_mouse(0, 0, area);
+        assert!(outside_handled);
+        assert!(!app.state.show_overview_modal);
     }
 }

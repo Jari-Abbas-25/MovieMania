@@ -8,14 +8,14 @@ MovieBox-TUI is designed for fast keyboard navigation with complete mouse suppor
 | :--- | :--- |
 | **`↑` / `↓` / `k` / `j`** | Navigate lists, search results, or move cursor up/down |
 | **`←` / `→` / `h` / `l`** | Move text input cursor, step wide grid columns, or switch Details panes (Audio/Seasons/Episodes/Streams) |
-| **`Home` / `End` / `g` / `G`** | Jump to start / end of list or search results (auto-fetches next page), or move cursor to beginning / end of input line |
-| **`PageUp` / `PageDown`** | Scroll search results, lists, and modal pickers by visible page height (or scroll help overlay) |
+| **`Home` / `End` / `g` / `G`** | Jump to start / end of search results (Home screen only), or move cursor to beginning / end of input line |
+| **`PageUp` / `PageDown`** | Scroll search results, lists, help overlay, and modal pickers by visible page height |
 | **`Enter`** | Open, play, or confirm the selected item |
-| **`Space` / `P`** | Direct resume playback for recorded season/episode on `/history` or Home Resume items |
+| **`Space` / `P`** | Direct resume playback for recorded season/episode on `/history` or Home Continue Watching deck |
 | **`Esc`** | Dismiss active notifications, focus search input (when results present), dismiss popup dialog, or return to landing |
-| **`Tab` / `Shift+Tab`** | Auto-complete suggestion / command; cycle landing deck tabs (Resume / Favorites); switch details panes; toggle dialog buttons |
+| **`Tab` / `Shift+Tab`** | Auto-complete suggestion (Tab); cycle landing deck tabs (Resume / Favorites); switch details panes; toggle dialog buttons |
 | **`Backspace`** | Delete character before cursor, or return focus to search bar from results |
-| **`d` / `Delete`** | Delete character at cursor in text inputs; remove selected entry in `/history`, Home Resume deck, or TV/Addon managers |
+| **`d` / `Delete`** | Delete character at cursor in text inputs; remove selected entry in `/history`, Home Continue Watching deck, or TV/Addon managers |
 | **`Ctrl+U`** | Clear entire input line (Search, TV URL, Addon URL) |
 | **`Ctrl+W`** | Delete backward word in text inputs |
 | **`c`** | Clear active search query and return to landing screen (Normal mode) |
@@ -45,26 +45,43 @@ Text editing across Search, TV Playlist Manager, and Addon Manager uses a unifie
 
 All popup dialogs (Theme picker, Browse categories, Provider menu, Settings Media Player picker, TV Manager, Addon Manager, Download Confirmation) support standard keyboard controls:
 
-- **`↑` / `↓` / `k` / `j`**: Move selection up / down by one item (vim keys `k`/`j` supported in pickers such as theme selector in Settings).
+- **`↑` / `↓` / `k` / `j`**: Move selection up / down by one item (vim keys `k`/`j` supported across all pickers: themes, browse categories, providers, players, TV manager, and addon manager).
 - **`Home` / `End`**: Jump immediately to the first or last item in the list.
-- **`PageUp` / `PageDown`**: Step up or down by 5 items.
-- **`Enter`**: Confirm selection, activate entry, or submit dialog.
+- **`PageUp` / `PageDown`**: Step up or down by 5 items (supported in provider menu, player picker, TV manager, and addon manager).
+- **`Enter` / `Space`**: Confirm selection, activate entry, or submit dialog.
 - **`Esc`**: Dismiss popup dialog without applying changes.
 - **Download Confirmation Dialog**:
+  - **`y` / `Y`**: Confirm and begin download immediately without navigating buttons.
+  - **`n` / `N`**: Cancel and dismiss confirmation dialog immediately.
+  - **`h` / `l`**: Switch focus between `[ Download ]` (`h`) and `[ Cancel ]` (`l`).
   - **`Tab` / `Shift+Tab` / `BackTab`**: Toggle active selection between `[ Download ]` and `[ Cancel ]`.
   - **`Left` / `Right`**: Switch between `[ Download ]` and `[ Cancel ]`.
   - **`Enter`**: Confirm the currently focused action.
   - **`Esc`**: Cancel and close the confirmation dialog.
+- **Sources Picker (Stream Sources)**:
+  - **`↑` / `↓` / `k` / `j`**: Navigate available stream sources.
+  - **`Enter` / `Space`**: Select highlighted stream source.
+  - **`Esc`**: Dismiss sources picker.
+- **Subtitle Picker**:
+  - **`↑` / `↓` / `k` / `j`**: Navigate subtitle language options.
+  - **`Enter`**: Select highlighted subtitle track.
+  - **`Esc`**: Dismiss subtitle picker.
+- **Overview / Synopsis Modal**:
+  - **`i`** (or click header card / click footer `[i] Info`): Open full Overview / Synopsis modal for current movie, series, or selected episode.
+  - **`↑` / `↓` / `k` / `j` / `PageUp` / `PageDown`**: Scroll synopsis text.
+  - **`Esc` / `Enter` / `q` / `i` / Click outside**: Dismiss overview modal.
 ## Mode-Specific Controls
 
 ### Streaming Mode
-- **`Ctrl+P`**: Cycle content providers (`MovieBox` → `4KHDHub` → `BDIX` → `Addons`). On the Details screen, re-searches and fetches alternate streams for the current movie in-place.
+- **`Ctrl+P`**: Cycle content providers (`MovieBox` → `4KHDHub` → `BDIX` → `Addons`) and return to Home search.
 - **`←` / `→` / `h` / `l` / `Tab` / `Shift+Tab`**: Switch Details screen selector panes (Audio Languages, Seasons, Episodes, Streams).
-- **`Enter`**: Play selected stream or open selected title.
+- **`i`**: Open full Overview / Synopsis modal for current movie, series, or selected episode.
+- **`Enter` / `p` / `P`**: Play selected stream or open selected title.
 - **`d`**: Download current episode or full season batch.
 - **`r`**: Refresh search results / stream list.
 - **`f`**: Favorite / unfavorite the selected title (Home & Details screens).
-- **`/settings`**: Open interactive Settings & Preferences Hub.
+- **Settings Screen**:
+  - **`d` / `D`**: Reset custom download directory to application default (when Directory row is highlighted).
 - **`/browse`**: Open curated browse categories (Trending, Popular, Top Rated, etc.).
 - **`/history`**: Open watch history (`Space` or `P` to instantly resume recorded episode/movie).
 - **`/favorites`**: Open your starred titles.
@@ -92,6 +109,8 @@ All popup dialogs (Theme picker, Browse categories, Provider menu, Settings Medi
 | **Click Resume row (landing)** | Select an in-progress title; click again to resume playback with auto-play |
 | **Click Favorites row (landing)** | Select a starred title; click again to open details |
 | **Click "+N more • /history" or "+N more • /favorites"** | Open the full watch history or favorites list |
+| **Click header metadata card** | Open full Overview / Synopsis modal for movie or series |
+| **Click footer "[i] Info"** | Open full Overview / Synopsis modal for current selection (movie, series, or episode) |
 | **Click audio / season / episode / stream** | Switch audio language, change season, or select episode; click a specific stream row to play; click empty stream pane space to focus without playing |
 | **Click footer buttons** | Switch provider / mode, open help (`[?]`), or quit (`[q]`) |
 | **Click modal buttons** | Choose a theme, subtitles, player, or confirm actions |

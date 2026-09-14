@@ -208,6 +208,52 @@ impl TextInputBuffer {
     pub fn move_end(&mut self) {
         self.cursor = self.len_graphemes();
     }
+    pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) -> bool {
+        use crossterm::event::{KeyCode, KeyModifiers};
+        match key.code {
+            KeyCode::Left => {
+                self.move_left();
+                true
+            }
+            KeyCode::Right => {
+                self.move_right();
+                true
+            }
+            KeyCode::Home => {
+                self.move_home();
+                true
+            }
+            KeyCode::End => {
+                self.move_end();
+                true
+            }
+            KeyCode::Backspace => {
+                self.delete_backwards();
+                true
+            }
+            KeyCode::Delete => {
+                self.delete_forwards();
+                true
+            }
+            KeyCode::Char('u') | KeyCode::Char('U')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.clear();
+                true
+            }
+            KeyCode::Char('w') | KeyCode::Char('W')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.delete_word_backwards();
+                true
+            }
+            KeyCode::Char(c) if !c.is_control() => {
+                self.insert(c);
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 impl From<&str> for TextInputBuffer {

@@ -43,20 +43,26 @@ pub fn render_single_line_input(
         start -= 1;
     }
 
-    let mut before_cursor: String = segments[start..cursor].concat();
-    if start > 0 {
-        let before_w = crate::tui::text::width(&before_cursor);
-        if before_w > 3 {
-            before_cursor = format!(
-                "...{}",
-                crate::tui::text::truncate_width(&before_cursor, before_w.saturating_sub(3))
-            );
+    let before_cursor = if start > 0 {
+        let budget = max_before_w.saturating_sub(3);
+        let mut adj_start = cursor;
+        let mut adj_w = 0;
+        while adj_start > 0 {
+            let gw = crate::tui::text::width(segments[adj_start - 1]);
+            if adj_w + gw > budget {
+                break;
+            }
+            adj_w += gw;
+            adj_start -= 1;
         }
-    }
+        format!("...{}", segments[adj_start..cursor].concat())
+    } else {
+        segments[..cursor].concat()
+    };
 
     let cursor_char = cursor_grapheme.to_string();
-
-    let remaining_after_w = available_width.saturating_sub(current_before_w + cursor_w);
+    let before_w = crate::tui::text::width(&before_cursor);
+    let remaining_after_w = available_width.saturating_sub(before_w + cursor_w);
     let mut end = cursor.saturating_add(1).min(segments.len());
     let mut current_after_w = 0;
     while end < segments.len() {
@@ -68,17 +74,25 @@ pub fn render_single_line_input(
         end += 1;
     }
 
-    let after_slice = &segments[cursor.saturating_add(1).min(segments.len())..end];
-    let mut after_cursor: String = after_slice.concat();
-    if end < segments.len() {
-        let after_w = crate::tui::text::width(&after_cursor);
-        if after_w > 3 {
-            let keep = crate::tui::text::truncate_width(&after_cursor, after_w.saturating_sub(3));
-            after_cursor = format!("{keep}...");
-        } else if !after_cursor.is_empty() {
-            after_cursor = "...".to_string();
+    let after_cursor = if end < segments.len() {
+        let budget = remaining_after_w.saturating_sub(3);
+        let mut adj_end = cursor.saturating_add(1).min(segments.len());
+        let mut adj_w = 0;
+        while adj_end < segments.len() {
+            let gw = crate::tui::text::width(segments[adj_end]);
+            if adj_w + gw > budget {
+                break;
+            }
+            adj_w += gw;
+            adj_end += 1;
         }
-    }
+        format!(
+            "{}...",
+            segments[cursor.saturating_add(1).min(segments.len())..adj_end].concat()
+        )
+    } else {
+        segments[cursor.saturating_add(1).min(segments.len())..end].concat()
+    };
     let lines = vec![
         Line::from(vec![Span::raw(" "), Span::styled(label, theme.sapphire)]),
         Line::from(vec![
@@ -156,6 +170,20 @@ mod tests {
                     &theme,
                     false,
                 );
+            })
+            .unwrap();
+    }
+    #[test]
+    fn test_render_single_line_input_truncation_no_double_ellipsis() {
+        let backend = TestBackend::new(20, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let buffer =
+            TextInputBuffer::from_str("https://very-long-domain-name.example.com/stream.m3u8");
+        let theme = Theme::default();
+
+        terminal
+            .draw(|f| {
+                render_single_line_input(f, Rect::new(0, 0, 20, 3), "URL:", &buffer, &theme, false);
             })
             .unwrap();
     }

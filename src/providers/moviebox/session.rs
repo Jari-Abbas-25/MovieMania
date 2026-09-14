@@ -96,8 +96,10 @@ pub fn parse_jwt_claims(token: &str) -> (Option<String>, Option<u64>) {
     (uid, exp)
 }
 
+pub const SESSION_CACHE_FILE: &str = "moviebox_session.bin";
+
 pub fn session_cache_path() -> PathBuf {
-    crate::config::cache_dir().join("moviebox_session.bin")
+    crate::config::cache_dir().join(SESSION_CACHE_FILE)
 }
 
 pub fn load_persisted_session() -> Option<MovieBoxSession> {

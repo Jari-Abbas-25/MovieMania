@@ -1,7 +1,6 @@
 #[derive(Debug, Clone)]
 pub enum Action {
     FocusChange,
-    LaunchPlayer(crate::tui::state::PlayerKind, String, Option<String>),
     Tick,
     Key(crossterm::event::KeyEvent),
     MouseClick(u16, u16),
@@ -64,7 +63,7 @@ pub enum Action {
     TabPane,
     BackTabPane,
     FetchPreview(String),
-    PreviewSuccess(u64, String, crate::providers::models::MediaDetails),
+    PreviewSuccess(u64, String, Box<crate::providers::models::MediaDetails>),
     PreviewFailure(u64, String),
     PlayStream,
     ShowSubtitlePopup(String, Vec<crate::providers::models::SubtitleOption>),
@@ -97,7 +96,7 @@ pub enum Action {
         crate::providers::models::RequestContext,
         u64,
         String,
-        crate::providers::models::MediaDetails,
+        Box<crate::providers::models::MediaDetails>,
     ),
     DetailsFailure(crate::providers::models::RequestContext, u64, String),
     InitStreamPool(String),
@@ -140,9 +139,9 @@ pub enum Action {
         crate::providers::models::PlaybackSource,
     ),
     DispatchPlayback(crate::providers::models::PlaybackSource),
-    MarkWatched(crate::history::WatchHistoryItem),
+    MarkWatched(Box<crate::history::WatchHistoryItem>),
     UpdateProgress {
-        item: crate::history::WatchHistoryItem,
+        item: Box<crate::history::WatchHistoryItem>,
         progress: u64,
         duration: Option<u64>,
         completed: bool,
@@ -160,4 +159,15 @@ pub enum Action {
         circleftp: bool,
         dhakaflix: bool,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_action_enum_size_bounded() {
+        let size = std::mem::size_of::<Action>();
+        assert!(size <= 128, "Action size is {size} bytes, expected <= 128");
+    }
 }

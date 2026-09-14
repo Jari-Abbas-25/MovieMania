@@ -34,6 +34,11 @@ impl App {
         };
         self.prepare_image_soft_refresh();
         self.reset_mode_state();
+        self.reset_transient_overlays();
+        self.state.subtitle_popup = false;
+        self.state.is_download_subtitle_popup = false;
+        self.state.player_picker_popup = false;
+        self.state.show_overview_modal = false;
         self.state.active_provider = provider;
         self.state.active_screen = Screen::Home;
         self.state.details_pane = crate::tui::state::DetailsPane::default();
@@ -427,6 +432,8 @@ impl App {
                             std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                         self.request_tasks.cancel_details();
                         self.request_tasks.cancel_streams();
+                        self.request_tasks.cancel_stream_pool_init();
+                        self.request_tasks.cancel_episode_prefetch();
                         self.state.in_flight_posters.clear();
                         self.state.active_preview_request =
                             self.state.active_preview_request.wrapping_add(1);
@@ -434,20 +441,9 @@ impl App {
                             self.state.active_details_request.wrapping_add(1);
                         self.state.active_resource_request =
                             self.state.active_resource_request.wrapping_add(1);
-                        self.state.stream_pool.clear();
-                        self.state.pending_episode_fetch = None;
-                        self.state.selected_details = None;
-                        self.state.selected_resources.clear();
-                        self.state.active_subject_id = None;
-                        self.state.available_seasons.clear();
-                        self.state.available_episode_numbers.clear();
-                        self.state.is_fetching_streams = false;
-                        self.state.stream_error = None;
-                        self.state.poster_image = None;
-                        self.state.poster_protocol = None;
+                        self.state.reset_details_view();
                         self.state.active_screen = Screen::Home;
                         self.state.is_loading = false;
-                        self.state.language_chosen = false;
                         self.state
                             .set_status_default("Select a movie/series and press Enter");
                     }
