@@ -332,8 +332,10 @@ pub fn notifications(
     let bottom_offset = if download_active { 5 } else { 2 };
     let mut y = area.bottom().saturating_sub(bottom_offset);
 
-    let (max_visible, max_card_w, max_msg_lines) = if area.height < 20 || area.width < 65 {
+    let (max_visible, max_card_w, max_msg_lines) = if area.height < 20 {
         (1, 42.min(area.width.saturating_sub(4) as usize), 1)
+    } else if area.width < 65 {
+        (1, 42.min(area.width.saturating_sub(4) as usize), 2)
     } else if area.height < 30 {
         (2, 56.min(area.width.saturating_sub(4) as usize), 2)
     } else {
@@ -563,8 +565,10 @@ pub fn notification_rects(
     let mut y = area.bottom().saturating_sub(bottom_offset);
     let theme_placeholder = Theme::default();
 
-    let (max_visible, max_card_w, max_msg_lines) = if area.height < 20 || area.width < 65 {
+    let (max_visible, max_card_w, max_msg_lines) = if area.height < 20 {
         (1, 42.min(area.width.saturating_sub(4) as usize), 1)
+    } else if area.width < 65 {
+        (1, 42.min(area.width.saturating_sub(4) as usize), 2)
     } else if area.height < 30 {
         (2, 56.min(area.width.saturating_sub(4) as usize), 2)
     } else {
@@ -641,23 +645,29 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
+        .filter(|l| {
+            let lower = l.to_ascii_lowercase();
+            !lower.contains("read full changelog")
+                && !lower.contains("press [o]")
+                && !lower.contains("press o to")
+        })
         .count();
 
-    let min_w: u16 = 46;
+    let min_w: u16 = 50;
     let max_w: u16 = 76;
     let available_w = area.width.saturating_sub(4);
     let desired_w = max_w.min(available_w).max(min_w.min(available_w));
 
-    let header_rows: u16 = 6;
-    let footer_rows: u16 = 4;
+    let header_rows: u16 = 3;
+    let footer_rows: u16 = 3;
     let available_height = area.height.saturating_sub(4);
     let available_note_rows =
-        (available_height.saturating_sub(header_rows + footer_rows) as usize).clamp(3, 12);
+        (available_height.saturating_sub(header_rows + footer_rows + 2) as usize).clamp(3, 16);
 
     let display_count = note_lines_count.min(available_note_rows);
     let has_more = note_lines_count > display_count;
-    let total_rows = header_rows + (display_count as u16) + footer_rows;
-    let desired_h = total_rows.clamp(12, available_height.max(12));
+    let total_rows = header_rows + (display_count as u16) + footer_rows + 2;
+    let desired_h = total_rows.min(available_height.max(8));
 
     const UPDATE_SEGMENT: u16 = 18;
     const OPEN_SEGMENT: u16 = 26;
@@ -671,7 +681,7 @@ pub fn update_modal_layout(area: Rect, notes: &str) -> UpdateModalLayout {
     };
     let footer_width = update_seg + open_seg + dismiss_seg;
 
-    let button_row_y = popup_area.y + popup_area.height.saturating_sub(2);
+    let button_row_y = popup_area.y + popup_area.height.saturating_sub(3);
     let inner_width = popup_area.width.saturating_sub(2);
     let footer_start = popup_area.x + 1 + inner_width.saturating_sub(footer_width) / 2;
     let update_btn_end_x = footer_start + update_seg;
@@ -701,10 +711,10 @@ mod tests {
         assert_eq!(layout.popup_area.width, 76);
         assert_eq!(layout.display_count, 4);
         assert!(!layout.has_more);
-        assert_eq!(layout.popup_area.height, 14);
+        assert_eq!(layout.popup_area.height, 12);
         assert_eq!(layout.popup_area.x, (80 - 76) / 2);
-        assert_eq!(layout.popup_area.y, (24 - 14) / 2);
-        assert_eq!(layout.button_row_y, layout.popup_area.y + 12);
+        assert_eq!(layout.popup_area.y, (24 - 12) / 2);
+        assert_eq!(layout.button_row_y, layout.popup_area.y + 9);
         let footer_start = layout.popup_area.x + 1 + (74 - 58) / 2;
         assert_eq!(layout.update_btn_end_x, footer_start + 18);
         assert_eq!(layout.open_btn_end_x, layout.update_btn_end_x + 26);
@@ -939,5 +949,19 @@ mod tests {
         let large_area = Rect::new(0, 0, 120, 35);
         let large_rects = notification_rects(large_area, &queue, false, false);
         assert_eq!(large_rects.len(), 3);
+    }
+
+    #[test]
+    fn test_notification_rects_mobile_portrait() {
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(Notification::new(
+            NotificationKind::Error,
+            "Title",
+            "Line 1\nLine 2",
+        ));
+        let mobile_portrait = Rect::new(0, 0, 40, 26);
+        let rects = notification_rects(mobile_portrait, &queue, false, false);
+        assert_eq!(rects.len(), 1);
+        assert!(rects[0].1.height >= 5);
     }
 }

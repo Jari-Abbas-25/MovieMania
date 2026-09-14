@@ -10,7 +10,7 @@ builds the exact command; `tui/app/playback.rs` spawns it.
 - macOS: IINA (if present), then mpv, then VLC (probing `/Applications`, `~/Applications`, Homebrew `/opt/homebrew/bin`, MacPorts `/opt/local/bin`, Nix profiles `~/.nix-profile/bin` and `/run/current-system/sw/bin`, and standard `/bin`).
 - Linux: mpv, then VLC (probing native `$PATH`, user `.local/bin`, Flathub/Flatpak user & system exports `org.videolan.VLC` / `io.mpv.Mpv`, Snap `/snap/bin/*`, Nix profiles, standard `/bin`, and `flatpak run`).
 - Windows: mpv, then VLC (probing executable-adjacent binaries, WinGet Links & Packages directory `%LOCALAPPDATA%\Microsoft\WinGet\Packages`, `%USERPROFILE%\Downloads` and `%USERPROFILE%\Desktop` extractions, `Program Files` including `mpv`, `mpv-player`, `mpv.net`, and `VideoLAN\VLC`, `LOCALAPPDATA\Programs`, portable drive roots `C:\mpv`, `C:\vlc`, `C:\tools`, Scoop shims & apps, Chocolatey, and Windows Registry `App Paths` and `Environment\Path`).
-- Android/Termux: Android intent chooser (`termux-open`, `termux-open-url`, or `termux-am`). Streams play via external Android video players (VLC for Android, Just Player, MX Player, MPV Android APK).
+- Android/Termux: Android intent chooser (`termux-open`, `termux-open-url`, or `termux-am`), prioritized at index 0 ahead of CLI `mpv` and `vlc` to avoid selecting headless players lacking display servers. Streams play via external Android video players.
 
 Resolution caches detected paths across runs while allowing newly installed players to be discovered dynamically when opening or navigating the Settings Hub (`/settings`), without requiring an application restart. A preferred player can be forced via `MOVIEBOX_PLAYER` env or `default_player` in config (e.g. `mpv`, `iina`, `vlc`, `android`), which reorders the list. The media player picker in the Settings Hub lists every detected player on your system and saves your selection to `config.json`. Playback launches directly using the preferred compatible player without intermediate modal dialogs.
 
@@ -53,10 +53,11 @@ When launching media with in-progress watch history, the player command automati
 - **Isolated Tracker vs Fallback Reconciliation**: Players with active Lua trackers (`mpv`, `iina-cli`) rely strictly on state file reconciliation, eliminating wall-clock progress overwrite races during pauses or seeks. Process elapsed time is used strictly as a guarded fallback for players without tracker scripts (e.g. VLC).
 ## Spawning
 
-`launch_player` spawns the player with null stdin/stdout, piped stderr, and its own
-process group (Unix) or no-console flag (Windows). A blocking task reads stderr and
-reports every non-zero process exit as a player error, including failures with no
-diagnostic output. Watch progress is reconciled only after a successful exit.
+`launch_player` spawns the player with null stdin, piped stderr (plus piped stdout for
+`PlayerKind::AndroidIntent` to intercept intent dispatcher error text), and its own
+process group (Unix) or no-console flag (Windows). A blocking task reads output and
+reports every non-zero process exit as a player error, surfacing compact, actionable
+diagnostics on mobile terminals. Watch progress is reconciled only after a successful exit.
 
 ## Android / Termux Playback Architecture
 
@@ -67,4 +68,8 @@ On Android (Termux), terminal sessions do not have access to an X11 or Wayland d
 - **Prerequisites**: Termux requires `pkg install -y termux-tools termux-am`.
   - `termux-open` (from `termux-tools`) broadcasts an `android.intent.action.VIEW` intent to `TermuxOpenReceiver`, presenting Android's native app chooser.
   - `termux-am` (from `termux-am`) connects directly to `termux-app`'s local Unix domain socket (`am.sock`), allowing intent parameter passing (including `User-Agent`, `Referer`, and subtitles).
+- **Actionable Mobile Diagnostics**: MovieBox-TUI parses intent dispatcher output and failure status codes, surfacing compact, player-neutral diagnostics formatted for mobile viewports:
+  - **Missing video player app**: Surfaces `No Video Player` (`Install a video player on Android.`).
+  - **Missing intent bridge / socket**: Surfaces `Termux Setup Needed` (`Run: pkg install -y termux-am`).
+  - **Headless CLI mpv**: Detects video output initialization failures and surfaces `CLI mpv Unsupported` (`Switch to Android Player in /settings.`).
   - **SELinux & Exit Code 126 Protection**: On Android 10+, executing `/system/bin/am` directly from an unrooted Termux environment causes Android's system shell to call `cmd activity`, which is blocked by SELinux when executing Termux app data binaries (`Permission denied`, exit code 126). MovieBox-TUI detects Termux environments, prevents illegal system `am` invocations, preserves `LD_PRELOAD` for Termux applet compatibility, and surfaces actionable remediation notifications.

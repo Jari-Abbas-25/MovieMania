@@ -388,8 +388,13 @@ impl App {
                 resume_seconds,
                 tracker_ref,
             );
+            let capture_stdout = matches!(kind, crate::tui::state::PlayerKind::AndroidIntent);
             command.stdin(std::process::Stdio::null());
-            command.stdout(std::process::Stdio::null());
+            if capture_stdout {
+                command.stdout(std::process::Stdio::piped());
+            } else {
+                command.stdout(std::process::Stdio::null());
+            }
             command.stderr(std::process::Stdio::piped());
 
             #[cfg(unix)]
@@ -402,12 +407,24 @@ impl App {
                 Ok(mut child) => {
                     let start_time = std::time::Instant::now();
                     let stderr_stream = child.stderr.take();
+                    let stdout_stream = child.stdout.take();
 
                     tokio::task::spawn_blocking(move || {
                         let mut error_output = String::new();
+                        if let Some(mut stdout) = stdout_stream {
+                            use std::io::Read;
+                            let _ = stdout.read_to_string(&mut error_output);
+                        }
                         if let Some(mut stderr) = stderr_stream {
                             use std::io::Read;
-                            let _ = stderr.read_to_string(&mut error_output);
+                            let mut stderr_output = String::new();
+                            let _ = stderr.read_to_string(&mut stderr_output);
+                            if !stderr_output.is_empty() {
+                                if !error_output.is_empty() {
+                                    error_output.push('\n');
+                                }
+                                error_output.push_str(&stderr_output);
+                            }
                         }
 
                         let result = child.wait();
@@ -821,16 +838,45 @@ impl App {
                     .unwrap_or_else(|| "unknown".into());
                 log::error!("player crashed (code {code_str}): {error_msg}");
 
-                let is_termux_perm_crash = crate::updater::artifact::is_termux_environment()
+                let is_termux = crate::updater::artifact::is_termux_environment();
+                let is_missing_activity = is_termux
+                    && (error_msg.contains("No Activity found")
+                        || error_msg.contains("ActivityNotFoundException")
+                        || error_msg.contains("no activity found"));
+
+                let is_termux_tool_crash = is_termux
                     && (code == Some(126)
                         || error_msg.contains("Permission denied")
                         || error_msg.contains("/system/bin/am")
-                        || error_msg.contains("termux-open"));
+                        || error_msg.contains("termux-open")
+                        || error_msg.contains("termux-am")
+                        || error_msg.contains("am.sock")
+                        || error_msg.contains("Could not connect to socket")
+                        || (code == Some(1)
+                            && (error_msg.is_empty()
+                                || error_msg.contains("status code 1")
+                                || error_msg.contains("broadcast"))));
 
-                let (title, message) = if is_termux_perm_crash {
+                let is_headless_mpv = is_termux
+                    && (error_msg.contains("Failed to open display")
+                        || error_msg.contains("video_out")
+                        || error_msg.contains("vo/gpu")
+                        || error_msg.contains("vo=gpu"));
+
+                let (title, message) = if is_missing_activity {
                     (
-                        "Termux Player Setup Required",
-                        "Install player intent tools: 'pkg install -y termux-tools termux-am' and ensure an Android player (VLC, MX Player, or Just Player) is installed.".to_string(),
+                        "No Video Player",
+                        "Install a video player on Android.".to_string(),
+                    )
+                } else if is_termux_tool_crash {
+                    (
+                        "Termux Setup Needed",
+                        "Run: pkg install -y termux-am".to_string(),
+                    )
+                } else if is_headless_mpv {
+                    (
+                        "CLI mpv Unsupported",
+                        "Switch to Android Player in /settings.".to_string(),
                     )
                 } else {
                     let display_err = if error_msg.is_empty() {
@@ -838,10 +884,13 @@ impl App {
                     } else {
                         error_msg.lines().last().unwrap_or(&error_msg).to_string()
                     };
-                    (
-                        "Player Error",
-                        format!("Crash code: {code_str}\n{display_err}"),
-                    )
+                    let formatted_msg = if display_err.starts_with("Player exited with status code")
+                    {
+                        display_err
+                    } else {
+                        format!("{display_err} (code {code_str})")
+                    };
+                    ("Playback Failed", formatted_msg)
                 };
 
                 self.state.set_status(format!("{title}: {message}"), 300);
@@ -1167,12 +1216,83 @@ mod tests {
             .notifications
             .back()
             .expect("expected notification");
-        assert_eq!(last_notification.title, "Termux Player Setup Required");
-        assert!(
-            last_notification
-                .message
-                .contains("pkg install -y termux-tools termux-am")
+        assert_eq!(last_notification.title, "Termux Setup Needed");
+        assert_eq!(last_notification.message, "Run: pkg install -y termux-am");
+    }
+
+    #[tokio::test]
+    async fn test_player_crashed_termux_missing_activity() {
+        let mut app = crate::tui::app::App::new();
+        unsafe {
+            std::env::set_var("TERMUX_VERSION", "0.118.0");
+        }
+        app.handle_playback(super::Action::PlayerCrashed(
+            Some(1),
+            "Error: Activity not started, no activity found to handle Intent".to_string(),
+        ))
+        .await;
+        unsafe {
+            std::env::remove_var("TERMUX_VERSION");
+        }
+        let last_notification = app
+            .state
+            .notifications
+            .back()
+            .expect("expected notification");
+        assert_eq!(last_notification.title, "No Video Player");
+        assert_eq!(
+            last_notification.message,
+            "Install a video player on Android."
         );
+    }
+
+    #[tokio::test]
+    async fn test_player_crashed_termux_headless_mpv() {
+        let mut app = crate::tui::app::App::new();
+        unsafe {
+            std::env::set_var("TERMUX_VERSION", "0.118.0");
+        }
+        app.handle_playback(super::Action::PlayerCrashed(
+            Some(1),
+            "Error opening/initializing the selected video_out (--vo) device.".to_string(),
+        ))
+        .await;
+        unsafe {
+            std::env::remove_var("TERMUX_VERSION");
+        }
+        let last_notification = app
+            .state
+            .notifications
+            .back()
+            .expect("expected notification");
+        assert_eq!(last_notification.title, "CLI mpv Unsupported");
+        assert_eq!(
+            last_notification.message,
+            "Switch to Android Player in /settings."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_player_crashed_termux_exit_code_1_generic() {
+        let mut app = crate::tui::app::App::new();
+        unsafe {
+            std::env::set_var("TERMUX_VERSION", "0.118.0");
+        }
+        app.handle_playback(super::Action::PlayerCrashed(
+            Some(1),
+            "Player exited with status code 1.".to_string(),
+        ))
+        .await;
+        unsafe {
+            std::env::remove_var("TERMUX_VERSION");
+        }
+        let last_notification = app
+            .state
+            .notifications
+            .back()
+            .expect("expected notification");
+        assert_eq!(last_notification.title, "Termux Setup Needed");
+        assert_eq!(last_notification.message, "Run: pkg install -y termux-am");
     }
 
     #[tokio::test]

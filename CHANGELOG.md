@@ -15,6 +15,11 @@
   - Updated the WebM walkthrough video attachment link to the latest asset URL across all localized READMEs and documentation.
   - Moved the `#optional-support` anchor target inside the collapsible `<details>` container with `tabindex="-1"`, enabling native browser ancestor-revealing and keyboard focus navigation to automatically expand the crypto donation section when clicking the Donate badge.
 
+- **Termux Android Player Prioritization and Compact Error Diagnostics**:
+  - Prioritized `PlayerKind::AndroidIntent` at index 0 in `player::detect()` when running inside Termux, preventing auto-selection of headless CLI `mpv` or `vlc` when CLI packages are installed without an active X11/Wayland display server.
+  - Piped stdout in addition to stderr for `AndroidIntent` process spawning in `src/tui/app/playback.rs`, capturing intent dispatcher errors (`ActivityNotFoundException`, `no activity found to handle Intent`, `am.sock` socket connection failures) previously discarded by `Stdio::null()`.
+  - Replaced generic `Crash code: 1` modals with compact, player-neutral diagnostics for missing video player apps (`No Video Player: Install a video player on Android.`), unconfigured Termux intent tools (`Termux Setup Needed: Run: pkg install -y termux-am`), and headless mpv execution in Termux (`CLI mpv Unsupported: Switch to Android Player in /settings.`).
+  - Tuned mobile toast message height constraints in `src/tui/overlay.rs` (`max_msg_lines = 2` when `area.height >= 20` and `area.width < 65`), ensuring two-line diagnostics are rendered without premature truncation on mobile portrait screens.
 ## [0.1.19] - 2026-09-13
 
 ### Added

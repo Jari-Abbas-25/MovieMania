@@ -45,6 +45,11 @@ impl PlayerKind {
 pub fn detect() -> Vec<PlayerKind> {
     let mut players = Vec::new();
 
+    let is_termux = crate::updater::artifact::is_termux_environment();
+    if is_termux && android_opener().is_some() {
+        players.push(PlayerKind::AndroidIntent);
+    }
+
     #[cfg(target_os = "macos")]
     if iina_available() {
         players.push(PlayerKind::Iina);
@@ -58,7 +63,7 @@ pub fn detect() -> Vec<PlayerKind> {
         players.push(PlayerKind::Vlc);
     }
 
-    if android_opener().is_some() {
+    if !is_termux && android_opener().is_some() {
         players.push(PlayerKind::AndroidIntent);
     }
 
@@ -1450,6 +1455,29 @@ mod tests {
             .map(|a| a.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
         assert!(args.contains(&"https://example.test/video.mp4".to_string()));
+    }
+
+    #[test]
+    fn test_detect_prioritizes_android_intent_on_termux() {
+        let temp_dir = std::env::temp_dir().join(format!("termux_test_{}", std::process::id()));
+        let bin_dir = temp_dir.join("bin");
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        let termux_am = bin_dir.join("termux-am");
+        std::fs::write(&termux_am, "#!/bin/sh\nexit 0").unwrap();
+
+        unsafe {
+            std::env::set_var("TERMUX_VERSION", "0.118.0");
+            std::env::set_var("PREFIX", temp_dir.to_str().unwrap());
+        }
+        let detected = detect();
+        unsafe {
+            std::env::remove_var("TERMUX_VERSION");
+            std::env::remove_var("PREFIX");
+        }
+        let _ = std::fs::remove_dir_all(&temp_dir);
+
+        assert!(!detected.is_empty());
+        assert_eq!(detected[0], PlayerKind::AndroidIntent);
     }
 
     #[test]

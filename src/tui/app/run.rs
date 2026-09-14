@@ -1094,6 +1094,12 @@ impl App {
                 .lines()
                 .map(|l| l.trim())
                 .filter(|l| !l.is_empty())
+                .filter(|l| {
+                    let lower = l.to_ascii_lowercase();
+                    !lower.contains("read full changelog")
+                        && !lower.contains("press [o]")
+                        && !lower.contains("press o to")
+                })
                 .collect();
 
             let inner_area = crate::tui::widgets::ModalFrame::new(
@@ -1196,7 +1202,6 @@ impl App {
                         .add_modifier(ratatui::style::Modifier::BOLD),
                 ),
             ]));
-            let line_width = (inner_area.width as usize).saturating_sub(6);
             let basic = self.state.basic_terminal;
 
             for line in note_lines.iter().take(display_count) {
@@ -1208,7 +1213,7 @@ impl App {
                     || trimmed.starts_with("# ")
                 {
                     let title = trimmed.trim_start_matches('#').trim();
-                    spans.push(Span::raw("    "));
+                    spans.push(Span::raw("  "));
                     if title.eq_ignore_ascii_case("Added") {
                         spans.push(Span::styled(
                             "[Added]",
@@ -1254,7 +1259,7 @@ impl App {
                     }
                 } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
                     let bullet = trimmed[2..].trim();
-                    spans.push(Span::raw("      "));
+                    spans.push(Span::raw("    "));
                     spans.push(Span::styled(
                         if basic { "- " } else { "• " },
                         self.theme.accent,
@@ -1277,10 +1282,9 @@ impl App {
                                 spans.push(Span::styled(colon, self.theme.subtext1));
                             }
                             if !clean_rest.is_empty() {
-                                let budget = line_width
-                                    .saturating_sub(8)
-                                    .saturating_sub(crate::tui::text::width(title))
-                                    .saturating_sub(colon.len());
+                                let prefix_w = 4 + 2 + crate::tui::text::width(title) + colon.len();
+                                let budget =
+                                    (inner_area.width as usize).saturating_sub(prefix_w + 2);
                                 if budget > 0 {
                                     spans.push(Span::styled(
                                         crate::tui::text::truncate_width(&clean_rest, budget)
@@ -1291,29 +1295,26 @@ impl App {
                             }
                         } else {
                             let clean = bullet.replace('`', "");
+                            let budget = (inner_area.width as usize).saturating_sub(4 + 2 + 2);
                             spans.push(Span::styled(
-                                crate::tui::text::truncate_width(
-                                    &clean,
-                                    line_width.saturating_sub(8),
-                                )
-                                .into_owned(),
+                                crate::tui::text::truncate_width(&clean, budget).into_owned(),
                                 self.theme.text,
                             ));
                         }
                     } else {
                         let clean = bullet.replace('`', "");
+                        let budget = (inner_area.width as usize).saturating_sub(4 + 2 + 2);
                         spans.push(Span::styled(
-                            crate::tui::text::truncate_width(&clean, line_width.saturating_sub(8))
-                                .into_owned(),
+                            crate::tui::text::truncate_width(&clean, budget).into_owned(),
                             self.theme.text,
                         ));
                     }
                 } else {
                     let clean = trimmed.replace('`', "");
-                    spans.push(Span::raw("      "));
+                    let budget = (inner_area.width as usize).saturating_sub(4 + 2);
+                    spans.push(Span::raw("    "));
                     spans.push(Span::styled(
-                        crate::tui::text::truncate_width(&clean, line_width.saturating_sub(6))
-                            .into_owned(),
+                        crate::tui::text::truncate_width(&clean, budget).into_owned(),
                         self.theme.text_dim,
                     ));
                 }
@@ -1399,7 +1400,7 @@ impl App {
             };
 
             text.push(Line::from(buttons).alignment(Alignment::Center));
-
+            text.push(Line::from(""));
             let popup = Paragraph::new(text);
             frame.render_widget(popup, inner_area);
         }
@@ -1414,9 +1415,9 @@ impl App {
         use ratatui::text::{Line, Span};
         use ratatui::widgets::Paragraph;
 
-        let width = 56.min(area.width.saturating_sub(4)).max(36);
-        let height = 9.min(area.height.saturating_sub(2)).max(7);
-        let popup_area = crate::tui::overlay::centered(area, width, height, 36, 56);
+        let width = 50.min(area.width.saturating_sub(4)).max(36);
+        let height = 7.min(area.height.saturating_sub(2)).max(5);
+        let popup_area = crate::tui::overlay::centered(area, width, height, 36, 50);
 
         let inner_area = crate::tui::widgets::ModalFrame::new(
             "Self-Update in Progress",
@@ -1485,8 +1486,8 @@ impl App {
                 ),
             ])
             .alignment(Alignment::Center),
+            Line::from(""),
         ];
-
         let popup = Paragraph::new(text);
         frame.render_widget(popup, inner_area);
     }
