@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.20] - 2026-09-14
 
 ### Added
 - **Overview and Synopsis Modal with Stremio Episode Summary Support**:
