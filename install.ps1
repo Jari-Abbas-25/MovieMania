@@ -244,16 +244,37 @@ $EffectiveInstallDir = if ($InstallDir) { $InstallDir } else { $DefaultInstallDi
 $ExePath = Join-Path $EffectiveInstallDir $BinName
 
 if (Test-Path $ExePath) {
-    try {
-        $CurrentVerOutput = (& $ExePath --version 2>&1 | Out-String)
-        if ($CurrentVerOutput -match "moviebox-tui\s+([\d\.]+)") {
-            $CurrentVer = "v" + $matches[1]
-            if ($CurrentVer -eq $TargetVersion -and (-not $Force)) {
-                Write-Success "MovieBox-TUI $TargetVersion is already installed at $ExePath. Use -Force to reinstall."
+    if (-not $Force) {
+        $IsInteractive = [Environment]::UserInteractive -and (-not [Console]::IsInputRedirected)
+        if ($IsInteractive) {
+            Write-Host ""
+            Write-Warn "$AppName is already installed at $ExePath"
+            Write-Host "  What would you like to do?"
+            Write-Host "    1) Reinstall / Update to latest version"
+            Write-Host "    2) Uninstall"
+            Write-Host "    3) Cancel"
+            Write-Host ""
+            $Choice = Read-Host "  Enter choice [1-3] (default 1)"
+            if ($Choice -eq "2") {
+                Do-Uninstall
+                exit 0
+            } elseif ($Choice -eq "3") {
+                Write-Success "No changes made. Exiting."
                 exit 0
             }
+        } else {
+            try {
+                $CurrentVerOutput = (& $ExePath --version 2>&1 | Out-String)
+                if ($CurrentVerOutput -match "moviebox-tui\s+([\d\.]+)") {
+                    $CurrentVer = "v" + $matches[1]
+                    if ($CurrentVer -eq $TargetVersion) {
+                        Write-Success "MovieBox-TUI $TargetVersion is already installed at $ExePath. Use -Force to reinstall."
+                        exit 0
+                    }
+                }
+            } catch {}
         }
-    } catch {}
+    }
 }
 
 if ($DryRun) {

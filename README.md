@@ -99,6 +99,31 @@ gh attestation verify <archive-file> -R mesamirh/MovieBox-Tui
 ```
 
 </details>
+<details>
+<summary><b>Uninstallation</b></summary>
+
+#### Automated Installer (macOS, Linux, Windows, Android)
+
+Simply re-run your original install command (`curl ... | bash` or `irm ... | iex`). When MovieBox-TUI is already installed, the installer automatically detects it and displays an interactive menu:
+
+```text
+MovieBox-TUI is already installed.
+What would you like to do?
+  1) Reinstall / Update to latest version
+  2) Uninstall
+  3) Cancel
+```
+
+Enter `2` to completely remove MovieBox-TUI.
+
+#### Package Managers
+
+```bash
+brew uninstall moviebox-tui     # Homebrew (macOS)
+cargo uninstall moviebox-tui    # Cargo
+```
+
+</details>
 
 ## Quick Start
 
