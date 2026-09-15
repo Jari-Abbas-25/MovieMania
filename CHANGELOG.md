@@ -16,10 +16,13 @@
   - Updated `rustls` to `0.23.45` and `rustls-webpki` to `0.103.15`, resolving security advisory `RUSTSEC-2026-0285` (TLS 1.3 handshake boundary handling).
 
 ### Changed
-- **Concise Provider Error Messaging**:
+- **Concise Error and Status Messaging**:
   - Streamlined `ProviderError::user_message` to output compact, high-signal status messages under 40 characters for mobile and compact viewports.
   - Replaced sprawling raw socket errors and leaked endpoint URLs with clear failure reasons (`CircleFTP unreachable: requires BDIX network.`, `MovieBox timed out.`, `Cannot reach 4KHDHub.`, `No results found.`).
-
+  - Shortened 4KHDHub playback and download resolution timeout messages to fit single-row status lines (`4KHDHub timed out. Try another release or Ctrl+P.`).
+  - Sanitized subtitle download/write error strings to prevent raw filesystem/network error leaks.
+  - Compacted addon torrent stream warning to `Blocked {} torrent streams. HTTP only.`.
+  - Streamlined player crash fallback diagnostic to `Player exited (code {code}).`.
 ### Fixed
 - **Update Modal Geometry & Symmetrical Border Padding**:
   - Eliminated unnecessary dead vertical gap below action buttons in "Update Available" dialog by calculating exact rendered line heights (`update_modal_layout_with_env`) accounting for installation environment notices.

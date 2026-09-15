@@ -675,7 +675,7 @@ impl App {
                                     sender.send(Action::PlayerExited).ok();
                                     sender
                                         .send(Action::SetStatus(
-                                            "Error: 4KHDHub stream resolution timed out. Select another release (e.g. 1080p) or press Ctrl+P for MovieBox.".to_string(),
+                                            "Error: 4KHDHub timed out. Try another release or Ctrl+P.".to_string(),
                                         ))
                                         .ok();
                                 }
@@ -934,16 +934,10 @@ impl App {
                         "Switch to Android Player in /settings.".to_string(),
                     )
                 } else {
-                    let display_err = if error_msg.is_empty() {
-                        "No error output provided by player.".to_string()
+                    let formatted_msg = if let Some(c) = code {
+                        format!("Player exited (code {c}).")
                     } else {
-                        error_msg.lines().last().unwrap_or(&error_msg).to_string()
-                    };
-                    let formatted_msg = if display_err.starts_with("Player exited with status code")
-                    {
-                        display_err
-                    } else {
-                        format!("{display_err} (code {code_str})")
+                        "Player process terminated.".to_string()
                     };
                     ("Playback Failed", formatted_msg)
                 };

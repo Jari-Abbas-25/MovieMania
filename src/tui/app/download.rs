@@ -185,41 +185,41 @@ impl App {
                     Ok(Ok(response)) => match response.error_for_status() {
                         Ok(response) => match response.bytes().await {
                             Ok(bytes) => {
-                                if let Err(error) = tokio::fs::write(subtitle_path, bytes).await {
+                                if tokio::fs::write(subtitle_path, bytes).await.is_err() {
                                     sender
-                                        .send(Action::SetStatus(format!(
-                                            "Error: subtitle write failed: {error}"
-                                        )))
+                                        .send(Action::SetStatus(
+                                            "Error: Subtitle save failed.".to_string(),
+                                        ))
                                         .ok();
                                 }
                             }
-                            Err(error) => {
+                            Err(_) => {
                                 sender
-                                    .send(Action::SetStatus(format!(
-                                        "Error: subtitle download failed: {error}"
-                                    )))
+                                    .send(Action::SetStatus(
+                                        "Error: Subtitle download failed.".to_string(),
+                                    ))
                                     .ok();
                             }
                         },
-                        Err(error) => {
+                        Err(_) => {
                             sender
-                                .send(Action::SetStatus(format!(
-                                    "Error: subtitle download failed: {error}"
-                                )))
+                                .send(Action::SetStatus(
+                                    "Error: Subtitle download failed.".to_string(),
+                                ))
                                 .ok();
                         }
                     },
-                    Ok(Err(error)) => {
+                    Ok(Err(_)) => {
                         sender
-                            .send(Action::SetStatus(format!(
-                                "Error: subtitle download failed: {error}"
-                            )))
+                            .send(Action::SetStatus(
+                                "Error: Subtitle download failed.".to_string(),
+                            ))
                             .ok();
                     }
                     Err(_) => {
                         sender
                             .send(Action::SetStatus(
-                                "Error: subtitle download timed out".to_string(),
+                                "Error: Subtitle download timed out.".to_string(),
                             ))
                             .ok();
                     }
@@ -555,7 +555,7 @@ impl App {
                                     log::error!("4KHDHub download resolve timed out");
                                     sender
                                         .send(Action::SetStatus(
-                                            "Error: 4KHDHub download resolution timed out. Select another release (e.g. 1080p) or press Ctrl+P for MovieBox.".to_string(),
+                                            "Error: 4KHDHub timed out. Try another release or Ctrl+P.".to_string(),
                                         ))
                                         .ok();
                                 }

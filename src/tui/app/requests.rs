@@ -1363,10 +1363,12 @@ impl App {
                             .await;
 
                         if !blocked_addons.is_empty() {
-                            sender.send(Action::SetStatus(format!(
-                                "Warning: {} streams blocked (raw torrents). Only HTTP streams are supported.",
-                                blocked_addons.join(", ")
-                            ))).ok();
+                            sender
+                                .send(Action::SetStatus(format!(
+                                    "Blocked {} torrent streams. HTTP only.",
+                                    blocked_addons.join(", ")
+                                )))
+                                .ok();
                         }
 
                         if !releases.is_empty() {
