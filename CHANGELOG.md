@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Automated Issue Quality, Version Validation, and Duplicate Management**:
+  - Modernized GitHub issue templates (`.github/ISSUE_TEMPLATE/`) with pre-submission checklists, target OS options (including Android Termux), and media player selector.
+  - Added `.github/workflows/incomplete-issue.yml` with semver release validation checking user versions against latest GitHub releases and printing platform upgrade commands.
+  - Implemented automated OS labeling (`os: android`, `os: linux`, `os: macos`, `os: windows`), title sanity validation, and Termux player setup guidance.
+  - Added automatic removal of `needs-info` and `stale` labels when the issue author provides responses.
+  - Added `.github/workflows/duplicate-detector.yml` using `actions-cool/issues-similarity` to flag and cross-reference duplicate issue submissions.
+  - Added `.github/workflows/stale.yml` to automatically close abandoned `needs-info` issues after 7 days of inactivity.
+
+### Fixed
+- **Update Modal Geometry & Symmetrical Border Padding**:
+  - Eliminated unnecessary dead vertical gap below action buttons in "Update Available" dialog by calculating exact rendered line heights (`update_modal_layout_with_env`) accounting for installation environment notices.
+  - Symmetrized vertical padding with balanced 1-row margins above the version header and below the action button row, eliminating bottom-heavy content displacement.
+  - Aligned inner horizontal margins to a uniform 2-column padding on both left and right borders, preventing premature right-side text truncation.
+  - Synchronized mouse click hitbox (`button_row_y`) with rendered action buttons across all package environments (DirectReplace, Homebrew, Termux, Flatpak, Snap).
+
 ## [0.1.20] - 2026-09-14
 
 ### Added
