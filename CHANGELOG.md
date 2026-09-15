@@ -4,12 +4,16 @@
 
 ### Added
 - **Automated Issue Quality, Version Validation, and Duplicate Management**:
-  - Modernized GitHub issue templates (`.github/ISSUE_TEMPLATE/`) with pre-submission checklists, target OS options (including Android Termux), and media player selector.
+  - Modernized GitHub issue templates (`.github/ISSUE_TEMPLATE/`) to link directly to official mdBook documentation site guides (`mesamirh.github.io/MovieBox-Tui/`).
   - Added `.github/workflows/incomplete-issue.yml` with semver release validation checking user versions against latest GitHub releases and printing platform upgrade commands.
   - Implemented automated OS labeling (`os: android`, `os: linux`, `os: macos`, `os: windows`), title sanity validation, and Termux player setup guidance.
   - Added automatic removal of `needs-info` and `stale` labels when the issue author provides responses.
   - Added `.github/workflows/duplicate-detector.yml` using `actions-cool/issues-similarity` to flag and cross-reference duplicate issue submissions.
   - Added `.github/workflows/stale.yml` to automatically close abandoned `needs-info` issues after 7 days of inactivity.
+
+### Security
+- **Dependency Advisory Remediation**:
+  - Updated `rustls` to `0.23.45` and `rustls-webpki` to `0.103.15`, resolving security advisory `RUSTSEC-2026-0285` (TLS 1.3 handshake boundary handling).
 
 ### Fixed
 - **Update Modal Geometry & Symmetrical Border Padding**:
