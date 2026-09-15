@@ -15,6 +15,11 @@
 - **Dependency Advisory Remediation**:
   - Updated `rustls` to `0.23.45` and `rustls-webpki` to `0.103.15`, resolving security advisory `RUSTSEC-2026-0285` (TLS 1.3 handshake boundary handling).
 
+### Changed
+- **Concise Provider Error Messaging**:
+  - Streamlined `ProviderError::user_message` to output compact, high-signal status messages under 40 characters for mobile and compact viewports.
+  - Replaced sprawling raw socket errors and leaked endpoint URLs with clear failure reasons (`CircleFTP unreachable: requires BDIX network.`, `MovieBox timed out.`, `Cannot reach 4KHDHub.`, `No results found.`).
+
 ### Fixed
 - **Update Modal Geometry & Symmetrical Border Padding**:
   - Eliminated unnecessary dead vertical gap below action buttons in "Update Available" dialog by calculating exact rendered line heights (`update_modal_layout_with_env`) accounting for installation environment notices.
