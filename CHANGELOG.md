@@ -24,6 +24,12 @@
   - Compacted addon torrent stream warning to `Blocked {} torrent streams. HTTP only.`.
   - Streamlined player crash fallback diagnostic to `Player exited (code {code}).`.
 ### Fixed
+- **tmux Poster Image Passthrough**:
+  - Replaced the hard-coded `$TMUX` detection block in `src/tui/terminal.rs` with an outer terminal graphics capability probe (`GHOSTTY_RESOURCES_DIR`, `KITTY_WINDOW_ID`, `WEZTERM_EXECUTABLE`, `ITERM_SESSION_ID`, `ALACRITTY_LOG`, `ALACRITTY_WINDOW_ID`, `foot`).
+  - Enabled automatic poster graphics queries and DCS passthrough inside `tmux` sessions running within Ghostty, Kitty, WezTerm, iTerm2, foot, and Alacritty, eliminating empty "No Art" placeholders.
+- **Legacy Windows Console Compatibility (Windows 8.1 & conhost)**:
+  - Eliminated unsupported `underline-color` control codes from ratatui crossterm backend, restoring full TUI rendering on Windows 8.1 and legacy Windows console hosts where `SetUnderlineColor` causes draw frame errors.
+  - Pruned unused `all-widgets`, `widget-calendar`, and `macros` feature dependencies from ratatui build graph.
 - **Update Modal Geometry & Symmetrical Border Padding**:
   - Eliminated unnecessary dead vertical gap below action buttons in "Update Available" dialog by calculating exact rendered line heights (`update_modal_layout_with_env`) accounting for installation environment notices.
   - Symmetrized vertical padding with balanced 1-row margins above the version header and below the action button row, eliminating bottom-heavy content displacement.
