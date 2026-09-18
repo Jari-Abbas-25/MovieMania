@@ -35,6 +35,9 @@
   - Compacted addon torrent stream warning to `Blocked {} torrent streams. HTTP only.`.
   - Streamlined player crash fallback diagnostic to `Player exited (code {code}).`.
 ### Fixed
+- **4KHDHub Multi-Stream Deduplication**:
+  - Fixed an issue where 4KHDHub stream releases were prematurely collapsed into a single item by scoping query-string-insensitive URL deduplication strictly to MovieBox CDN streams.
+  - Upgraded 4KHDHub stream cache schema to `v4_` to invalidate stale single-stream caches.
 - **Terminal Color Support Environment Isolation**:
   - Scoped process environment lookups (`ALACRITTY_WINDOW_ID`, `WEZTERM_EXECUTABLE`, `TILIX_ID`, `VTE_VERSION`) strictly to `ColorSupport::current()` rather than the pure `classify_terminal` helper.
   - Eliminated host environment variable leakage where running tests inside Alacritty or WezTerm falsely forced 256-color and basic terminals to report Truecolor support.
