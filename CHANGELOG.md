@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.21] - 2026-09-19
 
 ### Added
 - **Automated Issue Quality, Version Validation, and Duplicate Management**:
