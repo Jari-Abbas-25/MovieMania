@@ -81,7 +81,7 @@ impl App {
                     let clean_title = if query.starts_with('/') {
                         raw_title
                     } else {
-                        crate::providers::moviebox::clean_moviebox_title(&raw_title)
+                        crate::providers::moviebox::clean_moviebox_title(&raw_title).to_string()
                     };
 
                     if query.starts_with('/') {
@@ -332,7 +332,7 @@ impl App {
                         self.state.search_results.iter_mut().find(|r| r.id == id)
                     {
                         if existing.title.is_empty() {
-                            existing.title = clean_title;
+                            existing.title = clean_title.to_string();
                             existing.stype = stype;
                             existing.release_year = release_year;
                             existing.cover_url = cover_url;
@@ -365,7 +365,7 @@ impl App {
                     if !id.is_empty() {
                         self.state.search_results.push(SearchResult {
                             id,
-                            title: clean_title,
+                            title: clean_title.to_string(),
                             stype,
                             release_year,
                             cover_url,

@@ -15,6 +15,12 @@
 - **Dependency Advisory Remediation**:
   - Updated `rustls` to `0.23.45` and `rustls-webpki` to `0.103.15`, resolving security advisory `RUSTSEC-2026-0285` (TLS 1.3 handshake boundary handling).
 
+### Performance
+- **TUI Landing Frame Latency & Allocation Pruning**:
+  - Reduced landing frame draw latency from 28.95 µs to 23.03 µs (-20.4%) by eliminating per-frame heap allocations (`logo_text: &'static str`, zero-copy `&rows.rects` borrowing) and caching search result metrics across unscrollable viewports.
+- **Zero-Copy Title Normalization (`clean_moviebox_title`)**:
+  - Converted `clean_moviebox_title` from an allocating `String` generator to a pure zero-copy slice parser (`&str -> &str`), replacing allocating `.to_lowercase()` substring searches with in-place ASCII case-insensitive matching (`rfind_ignore_ascii_case`).
+  - Achieved sub-microsecond parsing latency: 191.43 ns/op over 10,000 operations with zero heap allocations.
 ### Changed
 - **Concise Error and Status Messaging**:
   - Streamlined `ProviderError::user_message` to output compact, high-signal status messages under 40 characters for mobile and compact viewports.
@@ -24,6 +30,14 @@
   - Compacted addon torrent stream warning to `Blocked {} torrent streams. HTTP only.`.
   - Streamlined player crash fallback diagnostic to `Player exited (code {code}).`.
 ### Fixed
+- **Terminal Color Support Environment Isolation**:
+  - Scoped process environment lookups (`ALACRITTY_WINDOW_ID`, `WEZTERM_EXECUTABLE`, `TILIX_ID`, `VTE_VERSION`) strictly to `ColorSupport::current()` rather than the pure `classify_terminal` helper.
+  - Eliminated host environment variable leakage where running tests inside Alacritty or WezTerm falsely forced 256-color and basic terminals to report Truecolor support.
+  - Extracted pure `is_vte_version_truecolor` validator, eliminating non-thread-safe `std::env::set_var` test mutations.
+- **Android Termux Intent Opener Resiliency & Socket Fallback**:
+  - Implemented multi-opener resolution in `src/player.rs` returning ordered candidate commands (`termux-am` → `termux-open` → `termux-open-url`).
+  - Added automatic in-flight fallback in `src/tui/app/playback.rs`: if `termux-am` exits with `am.sock` / socket connection failure on Android 12+, MovieBox-TUI automatically retries with `termux-open` without halting playback.
+  - Replaced long and inaccurate `"Run: pkg install -y termux-am"` notifications with concise mobile-formatted messages under 32 characters (`Termux Setup: Run 'pkg install termux-tools'.`, `No Player: Install a video player.`, `CLI mpv: Switch to Android Player in /settings.`).
 - **tmux Poster Image Passthrough**:
   - Replaced the hard-coded `$TMUX` detection block in `src/tui/terminal.rs` with an outer terminal graphics capability probe (`GHOSTTY_RESOURCES_DIR`, `KITTY_WINDOW_ID`, `WEZTERM_EXECUTABLE`, `ITERM_SESSION_ID`, `ALACRITTY_LOG`, `ALACRITTY_WINDOW_ID`, `foot`).
   - Enabled automatic poster graphics queries and DCS passthrough inside `tmux` sessions running within Ghostty, Kitty, WezTerm, iTerm2, foot, and Alacritty, eliminating empty "No Art" placeholders.
@@ -532,7 +546,7 @@
 ### Removed
 - **Poster Graphics Configuration & Halfblocks Engine**:
   - Removed Unicode Halfblocks poster engine (`▀`/`▄`), eliminating low-resolution cell distortion, font scanlines, and terminal redraw lag during list scrolling.
-  - Removed redundant `Poster Graphics` toggle from Settings Hub (`/settings` $\to$ Appearance) and `config.json`, delegating terminal graphics strictly to automatic native GPU protocol detection (Kitty, Sixel, iTerm2).
+  - Removed redundant `Poster Graphics` toggle from Settings Hub (`/settings` → Appearance) and `config.json`, delegating terminal graphics strictly to automatic native GPU protocol detection (Kitty, Sixel, iTerm2).
 
 ### Fixed
 - **Cross-Platform Handle Safety & Silent Failure Elimination**:
@@ -572,7 +586,7 @@
   - Streamlined `/config` as a direct alias for `/settings`.
 
 - **Pruned Redundant Theme Slash Command**:
-  - Removed standalone `/theme` slash command, parser routing, and auto-suggestions; theme selection and visual palette swatches are managed directly within the interactive Settings Hub (`/settings` $\to$ Appearance $\to$ Theme).
+  - Removed standalone `/theme` slash command, parser routing, and auto-suggestions; theme selection and visual palette swatches are managed directly within the interactive Settings Hub (`/settings` → Appearance → Theme).
 - **Discover Categories Landing Card UX**:
 - **Clean Segmented Landing Deck Header Styling**:
   - Replaced crowded decorative star (`★`) and bracket (`[ ]`) glyphs with a clean, segmented tab bar header (`Continue Watching │ Favorites (Tab)`).

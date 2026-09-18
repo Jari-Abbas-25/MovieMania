@@ -132,6 +132,21 @@ fn test_benchmark_performance_improvements_matrix() {
         assert!(opt_md5_duration <= baseline_md5_duration);
     }
 
+    let mut clean_title_duration = std::time::Duration::MAX;
+    for _ in 0..3 {
+        let t = Instant::now();
+        for i in 0..ITERATIONS {
+            let title = sample_titles[i % sample_titles.len()];
+            let _ = moviebox_tui::providers::moviebox::clean_moviebox_title(title);
+        }
+        clean_title_duration = clean_title_duration.min(t.elapsed());
+    }
+    println!(
+        "BENCHMARK: clean_moviebox_title ({} ops)\n  Duration:  {:?} ({:.2} ns/op)",
+        ITERATIONS,
+        clean_title_duration,
+        clean_title_duration.as_nanos() as f64 / ITERATIONS as f64
+    );
     let mut playlist_data = String::from("#EXTM3U\n");
     for i in 0..500 {
         playlist_data.push_str(&format!(

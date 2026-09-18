@@ -49,7 +49,7 @@ impl App {
             || !self.state.available_seasons.is_empty();
         let season = self.state.selected_season;
         let episode = self.state.selected_episode;
-        let safe_title = crate::download::safe_file_stem(&clean_title);
+        let safe_title = crate::download::safe_file_stem(clean_title);
 
         let extension = link
             .split('?')
@@ -683,7 +683,7 @@ impl App {
                         .map(|details| details.title.as_str())
                         .unwrap_or(crate::download::DEFAULT_STREAM_NAME);
                     let clean_title = crate::providers::moviebox::clean_moviebox_title(raw_title);
-                    let safe_title = crate::download::safe_file_stem(&clean_title);
+                    let safe_title = crate::download::safe_file_stem(clean_title);
 
                     let base_dir = self.resolve_download_base_dir();
                     let target_dir = base_dir
