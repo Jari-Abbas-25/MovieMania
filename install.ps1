@@ -246,6 +246,7 @@ if (-not $TargetVersion) {
         try {
             $ReleaseJson = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ "User-Agent" = "MovieBox-Installer" } -UseBasicParsing
             $TargetVersion = $ReleaseJson.tag_name.Trim()
+        } catch {
             Write-Err "Failed to contact GitHub for latest release. Please check your internet connection."
             return
         }
