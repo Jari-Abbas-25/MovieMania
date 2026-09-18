@@ -1886,7 +1886,7 @@ pub fn workflow_step_ranges(
     ));
 
     let sep_len = if state.basic_terminal { 3 } else { 5 };
-    let marker_len = 2; // "> " or "› "
+    let marker_len = 2;
     let mut total_w = 0;
     for (idx, (pane, label)) in steps.iter().enumerate() {
         if idx > 0 {
