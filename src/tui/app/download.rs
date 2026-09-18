@@ -532,7 +532,10 @@ impl App {
                         tokio::spawn(async move {
                             let result = tokio::time::timeout(
                                 std::time::Duration::from_secs(18),
-                                client.resolve_release(&release),
+                                client.resolve_release(
+                                    &release,
+                                    crate::providers::ResolutionIntent::Download,
+                                ),
                             )
                             .await;
                             match result {
@@ -548,14 +551,17 @@ impl App {
                                 Ok(Err(error)) => {
                                     log::error!("4KHDHub download resolve failed: {error}");
                                     sender
-                                        .send(Action::SetStatus(format!("Error: 4KHDHub: {error}")))
+                                        .send(Action::SetStatus(format!(
+                                            "Error: 4KHDHub: {}",
+                                            error.user_message()
+                                        )))
                                         .ok();
                                 }
                                 Err(_) => {
                                     log::error!("4KHDHub download resolve timed out");
                                     sender
                                         .send(Action::SetStatus(
-                                            "Error: 4KHDHub timed out. Try another release or Ctrl+P.".to_string(),
+                                            "Error: 4KHDHub: Timed out.".to_string(),
                                         ))
                                         .ok();
                                 }

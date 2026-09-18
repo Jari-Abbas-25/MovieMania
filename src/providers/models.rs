@@ -199,6 +199,11 @@ impl MediaDetails {
         }
     }
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolutionIntent {
+    Playback,
+    Download,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SourceMirror {

@@ -30,11 +30,22 @@
 - **Concise Error and Status Messaging**:
   - Streamlined `ProviderError::user_message` to output compact, high-signal status messages under 40 characters for mobile and compact viewports.
   - Replaced sprawling raw socket errors and leaked endpoint URLs with clear failure reasons (`CircleFTP unreachable: requires BDIX network.`, `MovieBox timed out.`, `Cannot reach 4KHDHub.`, `No results found.`).
-  - Shortened 4KHDHub playback and download resolution timeout messages to fit single-row status lines (`4KHDHub timed out. Try another release or Ctrl+P.`).
+  - Shortened 4KHDHub playback and download resolution timeout messages to fit single-row status lines (`4KHDHub timed out.`).
   - Sanitized subtitle download/write error strings to prevent raw filesystem/network error leaks.
   - Compacted addon torrent stream warning to `Blocked {} torrent streams. HTTP only.`.
   - Streamlined player crash fallback diagnostic to `Player exited (code {code}).`.
 ### Fixed
+- **In-Flight Notification Replacement & Compact Stream Errors**:
+  - Generalized notification category matching in `AppState::notify` across stream and playback domains, ensuring stream resolution errors replace in-flight "Preparing playback" toasts in-place instead of creating visual overlapping.
+  - Compacted 4KHDHub stream error messages from 135-character redundant text blocks to concise messages under 30 characters (`Mirrors dead or expired.`).
+- **4KHDHub Mediator Redirector Resolution**:
+  - Implemented automatic mediator unpacker in `src/providers/fourkhdhub/hubcloud.rs` supporting `greenmotors.club` and `greenmountmotors.` intermediate redirector domains.
+  - Implemented multi-stage decoding pipeline (double Base64, ROT13, JSON extraction) to transparently recover downstream HubCloud and HubDrive mirror endpoints without external browser dependencies.
+  - Excluded mediator domains from direct file classification in `parser.rs` and added mediator domain rejection to `validate_playback_url`.
+- **Playback vs Download Mirror Resolution Separation**:
+  - Introduced `ResolutionIntent` (`Playback` vs `Download`) in `src/providers/models.rs` and wired through `resolve_release`.
+  - For playback, prioritized seekable multi-connection video CDNs (`pixel.hubcloud.` -> Google Video CDN, Cloudflare R2, PixelDrain API) while deprioritizing single-use download workers (`workers.dev`).
+  - Added `downloadQuotaExceeded` and `Access Denied` error body detection in `FourKHdHubClient::preflight` to instantly reject exhausted worker links and prevent IINA HTTP authentication dialogs.
 - **4KHDHub Multi-Stream Deduplication**:
   - Fixed an issue where 4KHDHub stream releases were prematurely collapsed into a single item by scoping query-string-insensitive URL deduplication strictly to MovieBox CDN streams.
   - Upgraded 4KHDHub stream cache schema to `v4_` to invalidate stale single-stream caches.
