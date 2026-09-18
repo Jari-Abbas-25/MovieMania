@@ -120,12 +120,9 @@ fn rfind_ignore_ascii_case(haystack: &str, needle: &str) -> Option<usize> {
     }
     let h = haystack.as_bytes();
     let n = needle.as_bytes();
-    for i in (0..=h.len() - n.len()).rev() {
-        if h[i..i + n.len()].eq_ignore_ascii_case(n) {
-            return Some(i);
-        }
-    }
-    None
+    (0..=h.len() - n.len())
+        .rev()
+        .find(|&i| h[i..i + n.len()].eq_ignore_ascii_case(n))
 }
 
 fn contains_ignore_ascii_case(haystack: &str, needle: &str) -> bool {
