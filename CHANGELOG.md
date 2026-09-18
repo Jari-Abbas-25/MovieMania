@@ -22,6 +22,11 @@
   - Converted `clean_moviebox_title` from an allocating `String` generator to a pure zero-copy slice parser (`&str -> &str`), replacing allocating `.to_lowercase()` substring searches with in-place ASCII case-insensitive matching (`rfind_ignore_ascii_case`).
   - Achieved sub-microsecond parsing latency: 191.43 ns/op over 10,000 operations with zero heap allocations.
 ### Changed
+- **Windows Installer Terminal Lifecycle and Environment Propagation**:
+  - Replaced process-terminating `exit` statements with scoped `return` in `install.ps1`, preventing host terminal windows and tabs from abruptly closing during piped `iex` execution or on preflight warnings.
+  - Added Win32 `WM_SETTINGCHANGE` environment broadcast via `SendMessageTimeout`, forcing Windows Explorer and newly launched terminals to immediately refresh `PATH` without requiring a system sign-out.
+  - Removed buffer-wiping `[Console]::Clear()` from installer header initialization to preserve user terminal diagnostic history.
+  - Stripped Unix `$` shell prompt prefix from streaming launch guidance and added direct binary execution fallback path (`& "$ExePath"`) for existing terminal windows.
 - **Concise Error and Status Messaging**:
   - Streamlined `ProviderError::user_message` to output compact, high-signal status messages under 40 characters for mobile and compact viewports.
   - Replaced sprawling raw socket errors and leaked endpoint URLs with clear failure reasons (`CircleFTP unreachable: requires BDIX network.`, `MovieBox timed out.`, `Cannot reach 4KHDHub.`, `No results found.`).
