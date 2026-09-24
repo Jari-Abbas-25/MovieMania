@@ -260,6 +260,7 @@ impl CircleFtpClient {
                                             direct_file: true,
                                         }],
                                         resource_id: None,
+                                        qualities: quality.clone().map(|q| vec![q]).unwrap_or_default(),
                                     });
                                 }
                             }
@@ -296,6 +297,7 @@ impl CircleFtpClient {
                         direct_file: true,
                     }],
                     resource_id: None,
+                    qualities: quality.clone().map(|q| vec![q]).unwrap_or_default(),
                 });
             }
         }

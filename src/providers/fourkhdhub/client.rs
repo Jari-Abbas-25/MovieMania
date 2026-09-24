@@ -352,6 +352,7 @@ mod tests {
             episode: None,
             mirrors: Vec::new(),
             resource_id: None,
+            qualities: Vec::new(),
         };
         assert!(
             client

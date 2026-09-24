@@ -1,168 +1,226 @@
 <div align="center">
 
-# MovieBox-TUI
+  <img src="images/logo.png" alt="MovieMania Logo" width="130" style="border-radius: 24px; box-shadow: 0 4px 20px rgba(229, 9, 20, 0.4);" />
 
-**Terminal interface to find, download, and stream movies, TV shows, and live TV using local media players.**
+  # MovieMania
 
-[ English ](README.md) • [ বাংলা ](README_BN.md) • [ हिन्दी ](README_HI.md) • [ Español ](README_ES.md)
+  **A modern, cinematic streaming application built with Flutter, powered by a high-performance Rust core via Dart FFI.**
 
-[![Telegram](https://telegram-badge.vercel.app/api/telegram-badge?channelId=@getfromme&style=flat&logo=true)](https://t.me/getfromme)
-[![Donate](https://img.shields.io/badge/Donate-Crypto-F7931A?style=flat&logo=bitcoin&logoColor=white)](#optional-support)
+  <p>
+    <a href="https://flutter.dev/"><img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" /></a>
+    <a href="https://dart.dev/"><img src="https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" /></a>
+    <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust" /></a>
+    <a href="https://developer.android.com/"><img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" /></a>
+    <img src="https://img.shields.io/badge/Architecture-ARM64%20%7C%20ARMv7-E50914?style=for-the-badge" alt="Architecture" />
+    <img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="License" />
+  </p>
+
+  <p>
+    <a href="#-screenshots">Screenshots</a> •
+    <a href="#-key-features">Key Features</a> •
+    <a href="#-architecture">Architecture</a> •
+    <a href="#-installation">Installation</a> •
+    <a href="#-building-from-source">Build from Source</a> •
+    <a href="#-credits--acknowledgments">Credits</a>
+  </p>
+
 </div>
 
-[moviebox-tui-walkthrough.webm](https://github.com/user-attachments/assets/7554a7e5-6ff5-49ec-9d87-f821ea99950e)
+---
 
-## Features
+## 📸 Screenshots
 
-- **On Demand Streaming**: Stream movies, series, and anime across multiple providers and community Stremio addons.
-- **Live TV and IPTV**: Import custom M3U playlist URLs to search channels, browse categories, and stream live television.
-- **Native Video Playback**: Plays directly in your favorite player (`mpv`, `IINA`, `VLC`, or Android video players) with smooth hardware acceleration.
-- **Automatic Subtitles**: Automatically searches and loads subtitles in your preferred language into your player.
-- **Fast Downloads**: Save single episodes or entire seasons to your computer with pause and resume support.
-- **Visual Posters**: Displays cover art and movie posters directly inside your terminal window.
-- **Library and History**: Bookmark your favorite titles and pick up watching right where you left off.
-- **Custom Themes**: Built in color themes and settings to match your personal terminal look and feel.
-- **Cross Platform**: Works identically on macOS, Linux, Windows, and Android.
+<div align="center">
+  <table>
+    <tr>
+      <td width="25%" align="center">
+        <img src="images/1.jpeg" alt="MovieMania Splash Screen" width="100%" />
+        <br />
+        <b>Native Splash & Brand</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/2.jpeg" alt="Home Screen - Hero Section" width="100%" />
+        <br />
+        <b>Hero & Trending Rails</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/3.jpeg" alt="Home Screen - Content Rails" width="100%" />
+        <br />
+        <b>Catalog & Categories</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/4.jpeg" alt="Search Interface" width="100%" />
+        <br />
+        <b>Live Search Grid</b>
+      </td>
+    </tr>
+    <tr>
+      <td width="25%" align="center">
+        <img src="images/5.jpeg" alt="Search Results" width="100%" />
+        <br />
+        <b>Filtered Search Results</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/6.jpeg" alt="Movie & TV Details" width="100%" />
+        <br />
+        <b>Movie Details & Overview</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/7.jpeg" alt="Audio & Subtitle Selection" width="100%" />
+        <br />
+        <b>Audio & Subtitles</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/8.jpeg" alt="Quality & Stream Selection" width="100%" />
+        <br />
+        <b>Dynamic Quality Discovery</b>
+      </td>
+    </tr>
+  </table>
+</div>
 
-## Prerequisites
+---
 
-Requires at least one media player for streaming:
+## ✨ Key Features
 
-- **mpv** (recommended across Linux, macOS, and Windows)
-- **IINA** (macOS)
-- **VLC** (cross platform)
-- **Any Android Video Player** via Termux (VLC, Just Player, MX Player)
+- 🎬 **Cinematic Flutter UI**: Dark mode streaming interface featuring hero carousels, responsive catalog rails, shimmer skeleton loaders, and fluid transitions.
+- ⚡ **Rust Core via Dart FFI**: Integrates an existing Rust streaming engine compiled into native `.so` shared libraries for Android (`arm64-v8a` & `armeabi-v7a`), delivering fast metadata parsing with zero HTTP overhead.
+- 🔊 **Multi-Language Audio & Subtitles**: Select available audio dubs and automatic subtitle tracks per release.
+- 📊 **Dynamic DASH Resolution Parsing**: Discovers actual video stream resolutions (360p, 480p, 720p, 1080p, 4K) directly from live stream manifests.
+- 🛡️ **Android Foreground Playback Service**: Kotlin `PlaybackService` leveraging `MediaSessionCompat` and partial `WakeLock` to stream reliably to external players (`mpv`, `VLC`) without background suspension.
+- 📱 **Universal Standalone APK**: Self-contained release containing native binaries for both 64-bit and 32-bit Android devices without needing Termux or root.
+- 🌐 **Chrome / Web Dev Bridge**: Includes a local HTTP bridge enabling rapid UI prototyping on desktop Chrome before physical hardware deployment.
 
-*Poster graphics:* Image rendering requires a graphics capable terminal (Ghostty, Kitty, WezTerm, or iTerm2). Standard terminals display clean text layouts automatically.
+---
 
-*Optional for MovieBox downloads:* `yt-dlp` and `ffmpeg` are required only for downloading DASH streams from the MovieBox provider. All other providers download directly with the built in engine.
+## 🏗️ Architecture
 
-## Installation
+MovieMania bridges a high-level Flutter frontend with a low-level Rust streaming engine:
 
-### macOS and Linux
+```mermaid
+graph TD
+    A[Flutter UI / Dart] -->|dart:ffi| B[Rust Core Shared Library .so]
+    A -->|MethodChannel| C[Android Native PlaybackService]
+    B -->|Local Stream Forwarding| D[InProcessProxy]
+    C -->|MediaSessionCompat & WakeLock| D
+    D -->|Stream Output| E[External Video Player: mpv / VLC]
+```
 
-Open Terminal and run:
+### Component Breakdown
+
+| Layer | Technology | Role |
+| :--- | :--- | :--- |
+| **Frontend** | Flutter / Dart | UI layout, state management, catalog presentation, search, details, and playback selection modal. |
+| **Native Bridge** | `dart:ffi` | Direct in-memory C-ABI communication between Dart and Rust without local HTTP overhead on mobile. |
+| **Core Engine** | Rust (`libmoviebox_core.so`) | Provider scraping, manifest decoding, DASH parsing, and streaming pipeline. |
+| **Android Service** | Kotlin (`PlaybackService`) | Foreground service managing `MediaSessionCompat` and `WakeLock` to ensure stream continuity. |
+| **Player Integration** | Intent / URI Forwarding | Delegated hardware-accelerated playback via external players (`mpv-android`, `VLC`). |
+
+---
+
+## 📥 Installation
+
+### Android (APK)
+
+1. Download the latest `app-release.apk` from the [Releases](https://github.com/Jari-Abbas-25/MovieMania/releases) section.
+2. Install a compatible video player on your Android phone (Recommended: **[mpv for Android](https://play.google.com/store/apps/details?id=is.xyz.mpv)** or **[VLC](https://play.google.com/store/apps/details?id=org.videolan.vlc)**).
+3. Install and launch **MovieMania**:
+   ```bash
+   adb install -r "app-release.apk"
+   ```
+
+---
+
+## 🛠️ Building from Source
+
+### Prerequisites
+
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (`>= 3.10.0`)
+- [Rust & Cargo](https://rustup.rs/) (`stable` toolchain)
+- [Android NDK](https://developer.android.com/ndk) (for compiling Rust to Android ABI targets)
+- [cargo-ndk](https://github.com/bbqsrc/cargo-ndk) (`cargo install cargo-ndk`)
+
+### 1. Clone the Repository
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
+git clone https://github.com/Jari-Abbas-25/MovieMania.git
+cd MovieMania
 ```
 
-Or via Homebrew (macOS):
+### 2. Compile Rust Core for Android ABIs
 ```bash
-brew tap mesamirh/moviebox-tui https://github.com/mesamirh/MovieBox-Tui
-brew install moviebox-tui
-```
-*Note:* If Homebrew prompts for tap verification, run `brew trust mesamirh/moviebox-tui`.
-
-### Windows
-
-Open PowerShell and run:
-```powershell
-irm https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.ps1 | iex
+# Build 64-bit and 32-bit Android native libraries
+cargo ndk -t arm64-v8a -t armeabi-v7a -o ./android_app/android/app/src/main/jniLibs build --release
 ```
 
-### Android (Termux)
-
-Open Termux and run:
+### 3. Build Android Release APK
 ```bash
-pkg update && pkg install -y curl tar termux-tools termux-am
-curl -fsSL https://raw.githubusercontent.com/mesamirh/MovieBox-Tui/main/install.sh | bash
-termux-setup-storage
+cd android_app
+flutter pub get
+flutter build apk --release --target-platform android-arm64,android-arm
 ```
-*Note:* Requires an external video player installed on Android (e.g. VLC or any supported player).
-<details>
-<summary><b>Cargo and Source Build</b></summary>
+The compiled APK will be located at `android_app/build/app/outputs/flutter-apk/app-release.apk`.
 
-From crates.io:
-```bash
-cargo install moviebox-tui --locked
-```
+---
 
-From source:
-```bash
-git clone https://github.com/mesamirh/MovieBox-Tui.git
-cd MovieBox-Tui
-cargo build --release --locked
-```
+## 💻 Web / Chrome Development Workflow
 
-</details>
+For rapid UI development, MovieMania includes a local bridge server:
 
-<details>
-<summary><b>Verify Release Integrity</b></summary>
+1. **Start the Rust Dev Bridge:**
+   ```bash
+   cargo run --bin moviebox-tui -- --dev-bridge 8765
+   ```
 
-```bash
-sha256sum -c SHA256SUMS --ignore-missing
-gh attestation verify <archive-file> -R mesamirh/MovieBox-Tui
-```
+2. **Launch Flutter on Chrome:**
+   ```bash
+   cd android_app
+   flutter run -d chrome
+   ```
 
-</details>
-<details>
-<summary><b>Uninstallation</b></summary>
+---
 
-#### Automated Installer (macOS, Linux, Windows, Android)
-
-Simply re-run your original install command (`curl ... | bash` or `irm ... | iex`). When MovieBox-TUI is already installed, the installer automatically detects it and displays an interactive menu:
+## 📂 Project Structure
 
 ```text
-MovieBox-TUI is already installed.
-What would you like to do?
-  1) Reinstall / Update to latest version
-  2) Uninstall
-  3) Cancel
+MovieMania/
+├── android_app/                     # Flutter Application Root
+│   ├── android/                     # Android native project & PlaybackService
+│   │   └── app/src/main/jniLibs/    # Precompiled ARM64 & ARMv7 Rust .so libraries
+│   ├── assets/                      # Application icons & logo assets
+│   ├── lib/
+│   │   ├── core/
+│   │   │   ├── bridge/              # Dart FFI bindings & dev bridge client
+│   │   │   ├── models/              # Media, season, and stream data models
+│   │   │   └── player/              # Player launcher & platform intent handlers
+│   │   ├── screens/                 # Home, Search, Details, and Settings screens
+│   │   ├── theme/                   # Dark cinematic theme & color tokens
+│   │   └── widgets/                 # Movie cards, hero banner, skeleton loaders
+│   └── web/                         # Web platform assets & manifest
+├── src/                             # Rust Core Engine & Providers
+│   ├── bridge/                      # C-FFI exports & local dev bridge
+│   ├── providers/                   # Scrapers, DASH manifest parsers & stream resolvers
+│   └── proxy.rs                     # In-process proxy server for external players
+├── images/                          # High-resolution screenshots & brand assets
+├── .env.example                     # Environment template
+└── Cargo.toml                       # Rust workspace definition
 ```
 
-Enter `2` to completely remove MovieBox-TUI.
+---
 
-#### Package Managers
+## 🤝 Credits & Acknowledgments
 
-```bash
-brew uninstall moviebox-tui     # Homebrew (macOS)
-cargo uninstall moviebox-tui    # Cargo
-```
+- **[moviebox-tui](https://github.com/mesamirh/MovieBox-Tui)**: Full credit and gratitude to the open-source `moviebox-tui` project for the foundational Rust streaming engine and scrapers.
+- **Flutter & Rust Communities**: For providing exceptional tooling for cross-platform and FFI development.
+- **AI-Assisted Workflow**: Built and integrated through an AI-assisted development workflow, pairing Flutter/Dart engineering with AI-driven cross-language exploration and debugging.
 
-</details>
+---
 
-## Quick Start
+## 📜 License
 
-```bash
-moviebox-tui
-```
+This project is open-source software licensed under the **GNU General Public License v3.0 (GPL-3.0)**. See the [LICENSE](LICENSE) file for more details.
 
-- Type any title to search, press `Enter` to play.
-- Press `?` inside the TUI for shortcuts, or type `/settings` for preferences.
+---
 
-## Documentation
-
-Comprehensive guides and architectural references are available at [**mesamirh.github.io/MovieBox-Tui**](https://mesamirh.github.io/MovieBox-Tui/) or in the [`docs/`](docs/) directory.
-
-## Contributing
-
-Contributions are welcome. Review [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
-
-Report bugs or submit feature requests through [GitHub Issues](https://github.com/mesamirh/MovieBox-Tui/issues).
-
-<details>
-<summary><b>Optional Support</b></summary>
-<div id="optional-support" tabindex="-1"></div>
-
-If you would like to support ongoing development directly:
-
-| Network / Asset | Address |
-| :--- | :--- |
-| **USDT (TRC20)** | `TL4yW73qmbKZpBWwbEFgjBpwVkPDFTkJgV` |
-| **Bitcoin (BTC)** | `3MEAtqtRWrQBhnaMi3Zuf5nt2efNUS2LUQ` |
-| **Ethereum / EVM** | `0x7ea20d5fa29d87f33195f5a3b211ff94038d794c` |
-| **Solana (SOL)** | `6ctm5WFv73MNywoCKAz3xK72yizSspHa72rFNygooU6` |
-
-</details>
-
-## Privacy
-
-MovieBox-TUI contains zero telemetry, analytics, or user tracking. All search history, bookmarks, and configuration files remain strictly on your local filesystem.
-
-## License
-
-Licensed under either [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
-
-## Disclaimer
-
-This project does not host or store any media. It is an independent client for playing publicly available streams. Users are responsible for complying with the laws of their country.
+<div align="center">
+  <sub>Built with ❤️ for cinema enthusiasts.</sub>
+</div>

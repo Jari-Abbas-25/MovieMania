@@ -392,7 +392,7 @@ impl DhakaFlixClient {
                             releases.push(Release {
                                 provider: ProviderKind::BdixDhakaFlix,
                                 filename: filename_decoded,
-                                quality,
+                                quality: quality.clone(),
                                 codec,
                                 language,
                                 size_bytes: Some(size),
@@ -405,6 +405,7 @@ impl DhakaFlixClient {
                                     direct_file: true,
                                 }],
                                 resource_id: None,
+                                qualities: quality.clone().map(|q| vec![q]).unwrap_or_default(),
                             });
                         }
                     }

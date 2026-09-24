@@ -1363,6 +1363,7 @@ mod tests {
             episode: None,
             mirrors: vec![],
             resource_id: None,
+            qualities: vec!["1080p".to_string()],
         }];
         app.state.resource_list_state.select(Some(0));
 

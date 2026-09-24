@@ -1126,6 +1126,7 @@ mod tests {
                 episode: None,
                 mirrors: vec![],
                 resource_id: Some("167282974499786072".to_string()),
+                qualities: vec!["1080p".to_string()],
             },
             crate::providers::models::Release {
                 provider: crate::providers::models::ProviderKind::MovieBox,
@@ -1138,6 +1139,7 @@ mod tests {
                 episode: None,
                 mirrors: vec![],
                 resource_id: None,
+                qualities: vec!["720p".to_string()],
             },
         ];
 
@@ -1172,6 +1174,7 @@ mod tests {
                 direct_file: true,
             }],
             resource_id: Some("12345".to_string()),
+            qualities: vec!["1080p".to_string()],
         }];
         app.state.resource_list_state.select(Some(0));
 
@@ -1500,6 +1503,7 @@ mod tests {
             episode: Some(5),
             mirrors: vec![mirror],
             resource_id: Some("res_s2e5".to_string()),
+            qualities: vec!["1080p".to_string()],
         }];
         app.state.resource_list_state.select(Some(0));
         assert_eq!(

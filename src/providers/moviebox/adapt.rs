@@ -532,21 +532,24 @@ pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
         .filter(|s| !s.is_empty());
 
     if let Some(link) = resource_link {
-        let label = item
-            .get("uploadBy")
-            .or_else(|| item.get("source"))
-            .and_then(|u| u.as_str())
-            .unwrap_or("Direct")
-            .to_string();
+        if !is_deprecation_notice_url(link) {
+            let label = item
+                .get("uploadBy")
+                .or_else(|| item.get("source"))
+                .and_then(|u| u.as_str())
+                .unwrap_or("Direct")
+                .to_string();
 
-        mirrors.push(SourceMirror {
-            label,
-            resolver_url: link.to_string(),
-            headers: vec![],
-            direct_file: false,
-        });
+            mirrors.push(SourceMirror {
+                label,
+                resolver_url: link.to_string(),
+                headers: vec![],
+                direct_file: false,
+            });
+        }
     }
 
+    let initial_qualities = resolution.as_ref().map(|q| vec![q.clone()]).unwrap_or_default();
     Release {
         provider: ProviderKind::MovieBox,
         filename,
@@ -558,6 +561,7 @@ pub fn moviebox_resource_item_to_release(item: &serde_json::Value) -> Release {
         episode,
         mirrors,
         resource_id,
+        qualities: initial_qualities,
     }
 }
 
@@ -615,6 +619,35 @@ pub fn resolve_dash_manifest_from_policy(sign_cookie: &str) -> Option<String> {
                 && (base_resource.starts_with("http://") || base_resource.starts_with("https://"))
             {
                 return Some(format!("{base_resource}/index.mpd"));
+            }
+        } else if trimmed.contains("Edge-Cache-Cookie=") || trimmed.starts_with("urlprefix=") {
+            if let Some(urlprefix_raw) = trimmed.split("urlprefix=").nth(1) {
+                let prefix_b64 = urlprefix_raw.split(':').next().unwrap_or(urlprefix_raw).trim();
+                let mut normalized: String = prefix_b64
+                    .chars()
+                    .map(|c| match c {
+                        '-' => '+',
+                        '_' => '/',
+                        other => other,
+                    })
+                    .collect();
+                let padding = (4 - normalized.len() % 4) % 4;
+                if padding > 0 {
+                    normalized.push_str(&"=".repeat(padding));
+                }
+                if let Ok(decoded_bytes) =
+                    base64::engine::general_purpose::STANDARD.decode(normalized.as_bytes())
+                {
+                    if let Ok(base_url) = String::from_utf8(decoded_bytes) {
+                        let clean_base = base_url.trim_end_matches('*').trim_end_matches('/');
+                        if !clean_base.is_empty()
+                            && (clean_base.starts_with("http://")
+                                || clean_base.starts_with("https://"))
+                        {
+                            return Some(format!("{clean_base}/index.mpd"));
+                        }
+                    }
+                }
             }
         }
     }
@@ -748,6 +781,16 @@ pub fn moviebox_play_info_json_to_releases(
             direct_file: true,
         };
 
+        let initial_qualities: Vec<String> = if is_multi_res {
+            resolutions_str
+                .split(',')
+                .filter_map(|s| s.trim().parse::<u32>().ok())
+                .map(|h| format!("{h}p"))
+                .collect()
+        } else {
+            vec![format!("{max_res}p")]
+        };
+
         releases.push(Release {
             provider: ProviderKind::MovieBox,
             filename,
@@ -759,6 +802,7 @@ pub fn moviebox_play_info_json_to_releases(
             episode: if episode > 0 { Some(episode) } else { None },
             mirrors: vec![mirror],
             resource_id: stream_id,
+            qualities: initial_qualities,
         });
     }
 

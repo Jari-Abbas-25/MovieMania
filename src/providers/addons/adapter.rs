@@ -592,7 +592,7 @@ pub fn stream_item_to_release(
     Some(Release {
         provider: ProviderKind::Addons,
         filename,
-        quality,
+        quality: quality.clone(),
         codec,
         language,
         size_bytes,
@@ -605,6 +605,7 @@ pub fn stream_item_to_release(
             direct_file: true,
         }],
         resource_id: None,
+        qualities: quality.clone().map(|q| vec![q]).unwrap_or_default(),
     })
 }
 

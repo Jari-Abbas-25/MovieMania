@@ -59,10 +59,13 @@ flate2 = "1.0.35"
 tar = "0.4.44"
 zip = { version = "2.2.2", default-features = false, features = ["deflate"] }
 tempfile = "3.17.1"
+quick-xml = { version = "0.37", default-features = false }
 
 [lib]
 name = "moviebox_tui"
 path = "src/lib.rs"
+crate-type = ["lib", "cdylib"]
+
 
 [lints.clippy]
 collapsible_else_if = "allow"

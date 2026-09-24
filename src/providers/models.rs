@@ -232,6 +232,8 @@ pub struct Release {
     pub mirrors: Vec<SourceMirror>,
     #[serde(default)]
     pub resource_id: Option<String>,
+    #[serde(default)]
+    pub qualities: Vec<String>,
 }
 impl Release {
     pub fn is_multi_resolution(&self) -> bool {
@@ -424,6 +426,7 @@ mod tests {
             episode: None,
             mirrors: Vec::new(),
             resource_id: None,
+            qualities: Vec::new(),
         };
 
         assert_eq!(make_release(Some("4K")).resolution_u64(), 2160);

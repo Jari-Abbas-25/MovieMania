@@ -68,6 +68,14 @@ impl Drop for TerminalGuard {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    #[cfg(not(target_os = "android"))]
+    if let Some(pos) = args.iter().position(|a| a == "--dev-bridge" || a == "--dev-server") {
+        let port = args.get(pos + 1).and_then(|p| p.parse::<u16>().ok());
+        if let Err(e) = moviebox_tui::bridge::run_dev_bridge(port).await {
+            eprintln!("Dev bridge error: {e}");
+        }
+        return Ok(());
+    }
     if let Some(pos) = args.iter().position(|a| a == "--proxy-for-vlc") {
         let target_url = args.get(pos + 1).cloned().unwrap_or_default();
         let headers_json = args

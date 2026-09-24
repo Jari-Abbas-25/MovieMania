@@ -2051,6 +2051,7 @@ mod tests {
                     direct_file: false,
                 }],
                 resource_id: None,
+                qualities: vec!["2160p".to_string()],
             },
             Release {
                 provider: ProviderKind::FourKHdHub,
@@ -2068,6 +2069,7 @@ mod tests {
                     direct_file: false,
                 }],
                 resource_id: None,
+                qualities: vec!["1080p".to_string()],
             },
         ];
 

@@ -1,12 +1,69 @@
+# ==============================================================================
+# MovieMania — Git Ignore Configuration
+# ==============================================================================
+
+# --- Environment & Credentials ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.jks
+
+# --- Rust & Cargo ---
+/target/
 debug/
-target/
 **/*.rs.bk
 *.pdb
-.vscode/
+*.dylib
+*.dll
+*.exe
+!bin/mpv.exe
+
+# --- Flutter & Dart ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+android_app/.dart_tool/
+android_app/.flutter-plugins
+android_app/.flutter-plugins-dependencies
+android_app/.pub-cache/
+android_app/.pub/
+android_app/build/
+android_app/coverage/
+**/doc/api/
+app.*.symbols
+app.*.map.json
+
+# --- Android / Gradle ---
+.gradle/
+android_app/android/.gradle/
+android_app/android/local.properties
+android_app/android/app/build/
+android_app/android/app/debug
+android_app/android/app/profile
+android_app/android/app/release
+*.apk.sha1
+*.hprof
+*.dump
+
+
+# --- IDE & Editors ---
 .idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
 *.swp
 *.swo
-*.iml
+.history
+.buildlog/
+
+# --- Operating System Files ---
 .DS_Store
 .DS_Store?
 ._*
@@ -16,9 +73,8 @@ ehthumbs.db
 Thumbs.db
 .AppleDouble
 .LSOverride
-debug_*.json
+
+# --- Logs & Scratch Scripts ---
 *.log
-dist/
-book/
-docs/changelog.md
-docs/contributing.md
+debug_*.json
+scratch/

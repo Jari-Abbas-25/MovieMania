@@ -1172,7 +1172,7 @@ fn probe_vlc() -> Option<String> {
     )
 }
 
-fn mpv_executable() -> Option<String> {
+pub(crate) fn mpv_executable() -> Option<String> {
     static CACHED: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
 
     if let Ok(guard) = CACHED.read() {

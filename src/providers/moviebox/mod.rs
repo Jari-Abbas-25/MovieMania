@@ -116,34 +116,59 @@ impl crate::providers::ReleaseProvider for client::MovieBoxClient {
         let mut releases =
             adapt::moviebox_play_info_json_to_releases(&json, season, episode, self.user_agent());
 
-        if !releases.is_empty() {
+        let mut final_releases = if !releases.is_empty() {
             if let Some(upload_id) = upload_resource_id {
                 for rel in &mut releases {
                     rel.resource_id = Some(upload_id.clone());
                 }
             }
-            return Ok(releases);
-        }
-
-        let page = if episode > 0 {
-            (episode - 1) / 20 + 1
+            releases
         } else {
-            1
+            let page = if episode > 0 {
+                (episode - 1) / 20 + 1
+            } else {
+                1
+            };
+            let (items, _) = self
+                .fetch_resource_page(id, season, episode, 0, page)
+                .await
+                .map_err(ProviderError::from)?;
+            let mut legacy_releases = Vec::new();
+            for item in items {
+                let rel = adapt::moviebox_resource_item_to_release(&item);
+                if (season == 0 && episode == 0)
+                    || (rel.season == Some(season) && rel.episode == Some(episode))
+                {
+                    legacy_releases.push(rel);
+                }
+            }
+            legacy_releases
         };
-        let (items, _) = self
-            .fetch_resource_page(id, season, episode, 0, page)
-            .await
-            .map_err(ProviderError::from)?;
-        let mut legacy_releases = Vec::new();
-        for item in items {
-            let rel = adapt::moviebox_resource_item_to_release(&item);
-            if (season == 0 && episode == 0)
-                || (rel.season == Some(season) && rel.episode == Some(episode))
-            {
-                legacy_releases.push(rel);
+
+        for rel in &mut final_releases {
+            if let Some(mirror) = rel.mirrors.first() {
+                if mirror.resolver_url.ends_with(".mpd") || mirror.resolver_url.contains("/dash/") {
+                    let mut req = self.http_client().get(&mirror.resolver_url);
+                    for (k, v) in &mirror.headers {
+                        req = req.header(k, v);
+                    }
+                    if let Ok(resp) = tokio::time::timeout(std::time::Duration::from_secs(4), req.send()).await {
+                        if let Ok(resp) = resp {
+                            if resp.status().is_success() {
+                                if let Ok(xml) = resp.text().await {
+                                    let parsed_qualities = crate::providers::dash::extract_dash_video_qualities(&xml);
+                                    if !parsed_qualities.is_empty() {
+                                        rel.qualities = parsed_qualities;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-        Ok(legacy_releases)
+
+        Ok(final_releases)
     }
 }
 

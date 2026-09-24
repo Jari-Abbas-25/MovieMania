@@ -1067,6 +1067,7 @@ mod tests {
                 direct_file: true,
             }],
             resource_id: Some("98765".to_string()),
+            qualities: vec!["1080p".to_string()],
         }];
         app.state.resource_list_state.select(Some(0));
 
@@ -1094,6 +1095,7 @@ mod tests {
             episode: None,
             mirrors: vec![],
             resource_id: None,
+            qualities: vec!["1080p".to_string()],
         }];
         app.state.resource_list_state.select(Some(0));
 
@@ -1171,6 +1173,7 @@ mod tests {
                 direct_file: true,
             }],
             resource_id: Some("12345".to_string()),
+            qualities: vec!["1080p".to_string()],
         }];
         app.state.resource_list_state.select(Some(0));
 

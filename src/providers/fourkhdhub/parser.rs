@@ -202,9 +202,10 @@ pub fn parse_releases(
             .filter_map(|node| text_of(Some(node)))
             .find(|text| parse_size_bytes(text).is_some());
         let key = normalize_filename(&filename);
+        let qual = detect_quality(&filename);
         let release = grouped.entry(key).or_insert_with(|| Release {
             provider: ProviderKind::FourKHdHub,
-            quality: detect_quality(&filename),
+            quality: qual.clone(),
             codec: detect_codec(&filename),
             language: detect_language(&filename).or_else(|| page_language.clone()),
             size_bytes: size_text.as_deref().and_then(parse_size_bytes),
@@ -213,6 +214,7 @@ pub fn parse_releases(
             filename: filename.clone(),
             mirrors: Vec::new(),
             resource_id: None,
+            qualities: qual.map(|q| vec![q]).unwrap_or_default(),
         });
         for mirror in mirrors {
             if !release

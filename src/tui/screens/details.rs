@@ -2111,6 +2111,7 @@ mod tests {
                         direct_file: false,
                     }],
                     resource_id: None,
+                    qualities: vec!["1080p".to_string()],
                 },
                 Release {
                     provider: ProviderKind::MovieBox,
@@ -2128,6 +2129,7 @@ mod tests {
                         direct_file: false,
                     }],
                     resource_id: None,
+                    qualities: vec!["1080p".to_string()],
                 },
                 Release {
                     provider: ProviderKind::MovieBox,
@@ -2145,6 +2147,7 @@ mod tests {
                         direct_file: false,
                     }],
                     resource_id: None,
+                    qualities: vec!["720p".to_string()],
                 },
             ],
             details_pane: crate::tui::state::DetailsPane::Streams,
@@ -2252,6 +2255,7 @@ mod tests {
                     direct_file: true,
                 }],
                 resource_id: None,
+                qualities: vec!["1080p".to_string(), "720p".to_string(), "480p".to_string()],
             }],
             details_pane: crate::tui::state::DetailsPane::Streams,
             ..Default::default()
@@ -2314,6 +2318,7 @@ mod tests {
                     episode: None,
                     mirrors: vec![],
                     resource_id: None,
+                    qualities: vec!["1080p".to_string()],
                 },
                 Release {
                     provider: ProviderKind::MovieBox,
@@ -2326,6 +2331,7 @@ mod tests {
                     episode: None,
                     mirrors: vec![],
                     resource_id: None,
+                    qualities: vec!["720p".to_string()],
                 },
             ],
             details_pane: crate::tui::state::DetailsPane::Streams,
@@ -3160,6 +3166,7 @@ mod tests {
                 episode: None,
                 mirrors: vec![],
                 resource_id: Some("res-1".to_string()),
+                qualities: vec!["1080p".to_string(), "720p".to_string(), "480p".to_string()],
             }],
             details_pane: crate::tui::state::DetailsPane::Streams,
             show_episode_download_confirm: true,

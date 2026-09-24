@@ -266,6 +266,19 @@ pub fn get_provider_stream_cache_typed(
 ) -> Option<Vec<Release>> {
     let path = get_provider_stream_path(provider, subject_id, season, episode);
     let releases: Vec<Release> = get_typed_cache(&path, STREAM_CACHE_EXPIRY_SECS)?;
+    let has_stale_notice = releases.iter().any(|r| {
+        r.mirrors.iter().any(|m| {
+            let u = m.resolver_url.to_ascii_lowercase();
+            u.contains("macdn.aoneroom.com") && u.contains("/other/")
+                || u.contains("1c7de0bd3393702d9191801f15f88f8d")
+                || u.contains("9a0461bc39da389663bf3dbb17091d3f")
+                || u.contains("/notice.mp4")
+        })
+    });
+    if has_stale_notice {
+        let _ = std::fs::remove_file(&path);
+        return None;
+    }
     (!releases.is_empty()).then_some(releases)
 }
 

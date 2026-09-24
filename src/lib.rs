@@ -1,3 +1,4 @@
+pub mod bridge;
 pub mod cache;
 pub mod config;
 pub mod download;
@@ -12,3 +13,4 @@ pub mod proxy;
 pub mod service;
 pub mod tui;
 pub mod updater;
+

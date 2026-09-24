@@ -6,3 +6,13 @@ rustflags = ["-C", "target-feature=+crt-static"]
 
 [target.aarch64-unknown-linux-musl]
 rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=65536"]
+
+[target.aarch64-linux-android]
+linker = "C:\\Users\\Dell\\AppData\\Local\\Android\\Sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe"
+ar = "C:\\Users\\Dell\\AppData\\Local\\Android\\Sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\llvm-ar.exe"
+rustflags = ["-C", "link-arg=--target=aarch64-linux-android24"]
+
+[target.x86_64-linux-android]
+linker = "C:\\Users\\Dell\\AppData\\Local\\Android\\Sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe"
+ar = "C:\\Users\\Dell\\AppData\\Local\\Android\\Sdk\\ndk\\26.1.10909125\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\llvm-ar.exe"
+rustflags = ["-C", "link-arg=--target=x86_64-linux-android24"]
