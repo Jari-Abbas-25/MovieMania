@@ -34,46 +34,46 @@
   <table>
     <tr>
       <td width="25%" align="center">
-        <img src="images/1.jpeg" alt="MovieMania Splash Screen" width="100%" />
+        <img src="images/home%20page.jpeg" alt="Home Screen & Hero Section" width="100%" />
         <br />
-        <b>Native Splash & Brand</b>
+        <b>Home & Hero Section</b>
       </td>
       <td width="25%" align="center">
-        <img src="images/2.jpeg" alt="Home Screen - Hero Section" width="100%" />
-        <br />
-        <b>Hero & Trending Rails</b>
-      </td>
-      <td width="25%" align="center">
-        <img src="images/3.jpeg" alt="Home Screen - Content Rails" width="100%" />
-        <br />
-        <b>Catalog & Categories</b>
-      </td>
-      <td width="25%" align="center">
-        <img src="images/4.jpeg" alt="Search Interface" width="100%" />
+        <img src="images/search%20screen.jpeg" alt="Live Search & Filter Grid" width="100%" />
         <br />
         <b>Live Search Grid</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/movie%20details%20screen.jpeg" alt="Movie & Series Details Screen" width="100%" />
+        <br />
+        <b>Movie & Series Details</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/my%20watchlist.jpeg" alt="Watchlist & Library Screen" width="100%" />
+        <br />
+        <b>Watchlist & Library</b>
       </td>
     </tr>
     <tr>
       <td width="25%" align="center">
-        <img src="images/5.jpeg" alt="Search Results" width="100%" />
+        <img src="images/audio.jpeg" alt="Audio Language Selection" width="100%" />
         <br />
-        <b>Filtered Search Results</b>
+        <b>Audio Language Selection</b>
       </td>
       <td width="25%" align="center">
-        <img src="images/6.jpeg" alt="Movie & TV Details" width="100%" />
+        <img src="images/subtitle%20options.jpeg" alt="Subtitle Track Options" width="100%" />
         <br />
-        <b>Movie Details & Overview</b>
+        <b>Subtitle Options</b>
       </td>
       <td width="25%" align="center">
-        <img src="images/7.jpeg" alt="Audio & Subtitle Selection" width="100%" />
-        <br />
-        <b>Audio & Subtitles</b>
-      </td>
-      <td width="25%" align="center">
-        <img src="images/8.jpeg" alt="Quality & Stream Selection" width="100%" />
+        <img src="images/video%20quality%20options.jpeg" alt="Dynamic Video Quality Discovery" width="100%" />
         <br />
         <b>Dynamic Quality Discovery</b>
+      </td>
+      <td width="25%" align="center">
+        <img src="images/settings.jpeg" alt="App Settings & Engine Status" width="100%" />
+        <br />
+        <b>Settings & Engine Status</b>
       </td>
     </tr>
   </table>
